@@ -3,10 +3,84 @@
 #include <cstdlib> // For rand() and srand()
 #include <ctime>   // For seeding rand()
 #include <iostream>
+#include <stack>
+#include <algorithm> 
+#include <unordered_map>
+#include <queue>
+#include <unistd.h>
 
-#define GRID_SPACING 5 // Size of each cell (40x40 pixels)
-#define WALL_PROBABILITY 0.6 // Probability of a cell being a wall
+
+#define GRID_SPACING 10 // Size of each cell (40x40 pixels)
+#define WALL_PROBABILITY 0.64 // Probability of a cell being a wall
 #define CA_STEPS 5 // Number of Cellular Automata steps
+#define WALL 0
+#define PATH 1
+
+struct Cell {
+    int row, col;
+    Cell(int row, int col) : row(row), col(col) {}
+    bool isInsideGrid(int rows, int cols) const {
+        return row >= 0 && row < rows && col >= 0 && col < cols;
+    }
+};
+
+bool isInBounds(int row, int col, int rows, int cols) {
+    return row >= 0 && row < rows && col >= 0 && col < cols;
+}
+
+void addFrontier(const Cell& cell, const std::vector<std::vector<int>>& grid, std::vector<Cell>& frontier) {
+    int rows = grid.size();
+    int cols = grid[0].size();
+    std::vector<Cell> neighbors = {
+        {cell.row - 2, cell.col},
+        {cell.row + 2, cell.col},
+        {cell.row, cell.col - 2},
+        {cell.row, cell.col + 2}
+    };
+
+    for (const Cell& neighbor : neighbors) {
+        if (neighbor.isInsideGrid(rows, cols) && grid[neighbor.row][neighbor.col] == WALL) {
+            frontier.push_back(neighbor);
+        }
+    }
+}
+
+void PrimMaze(std::vector<std::vector<int>>& grid) {
+    int rows = grid.size();
+    int cols = grid[0].size();
+    std::vector<Cell> frontier;
+
+    // Start at a random cell and mark it as a path
+    Cell start(1, 1);
+    grid[start.row][start.col] = PATH;
+    addFrontier(start, grid, frontier);
+
+    // Randomly process frontier cells
+    while (!frontier.empty()) {
+        int idx = rand() % frontier.size();
+        Cell cell = frontier[idx];
+        frontier.erase(frontier.begin() + idx);
+
+        // Get neighboring path cells
+        std::vector<Cell> neighbors;
+        if (isInBounds(cell.row - 2, cell.col, rows, cols) && grid[cell.row - 2][cell.col] == PATH)
+            neighbors.push_back({cell.row - 2, cell.col});
+        if (isInBounds(cell.row + 2, cell.col, rows, cols) && grid[cell.row + 2][cell.col] == PATH)
+            neighbors.push_back({cell.row + 2, cell.col});
+        if (isInBounds(cell.row, cell.col - 2, rows, cols) && grid[cell.row][cell.col - 2] == PATH)
+            neighbors.push_back({cell.row, cell.col - 2});
+        if (isInBounds(cell.row, cell.col + 2, rows, cols) && grid[cell.row][cell.col + 2] == PATH)
+            neighbors.push_back({cell.row, cell.col + 2});
+
+        // If there is a neighboring path, carve a passage
+        if (!neighbors.empty()) {
+            Cell neighbor = neighbors[rand() % neighbors.size()];
+            grid[cell.row][cell.col] = PATH;
+            grid[(cell.row + neighbor.row) / 2][(cell.col + neighbor.col) / 2] = PATH;
+            addFrontier(cell, grid, frontier);
+        }
+    }
+}
 
 void drunkWalk(std::vector<std::vector<int>>& gridColors, int steps) {
     int rows = gridColors.size();
@@ -17,25 +91,25 @@ void drunkWalk(std::vector<std::vector<int>>& gridColors, int steps) {
     // int col = rand() % cols;
 
     // // start at the bottom left corner
-    // int row = rows - 1;
-    // int col = 0;
+    int row = rows - 1;
+    int col = 0;
 
     // randomly decide the corner to start at
-    int corner = rand() % 4;
-    int row, col;
-    if (corner == 0) {
-        row = rows - 1;
-        col = 0;
-    } else if (corner == 1) {
-        row = 0;
-        col = 0;
-    } else if (corner == 2) {
-        row = 0;
-        col = cols - 1;
-    } else {
-        row = rows - 1;
-        col = cols - 1;
-    }
+    // int corner = rand() % 4;
+    // int row, col;
+    // if (corner == 0) {
+    //     row = rows - 1;
+    //     col = 0;
+    // } else if (corner == 1) {
+    //     row = 0;
+    //     col = 0;
+    // } else if (corner == 2) {
+    //     row = 0;
+    //     col = cols - 1;
+    // } else {
+    //     row = rows - 1;
+    //     col = cols - 1;
+    // }
     
     for (int i = 0; i < steps; ++i) {
         gridColors[row][col] = 1; // Paint current cell black
@@ -50,6 +124,7 @@ void drunkWalk(std::vector<std::vector<int>>& gridColors, int steps) {
         else if (direction == 3 && col < cols - 1) col++; // Right
     }
 }
+
 // Function to initialize the grid randomly
 void initializeGrid(std::vector<std::vector<int>>& grid, float wallProbability) {
     for (int row = 0; row < grid.size(); ++row) {
@@ -58,19 +133,19 @@ void initializeGrid(std::vector<std::vector<int>>& grid, float wallProbability) 
         }
     }
 
-    // Set the outer border to be walls
-    for (int i = 0; i < grid.size(); ++i) {
-        grid[i][0] = 1;
-        grid[i][grid[0].size() - 1] = 1;
-    }
-    for (int i = 0; i < grid[0].size(); ++i) {
-        grid[0][i] = 1;
-        grid[grid.size() - 1][i] = 1;
-    }
+//     // Set the outer border to be walls
+//     for (int i = 0; i < grid.size(); ++i) {
+//         grid[i][0] = 1;
+//         grid[i][grid[0].size() - 1] = 1;
+//     }
+//     for (int i = 0; i < grid[0].size(); ++i) {
+//         grid[0][i] = 1;
+//         grid[grid.size() - 1][i] = 1;
+//     }
 
-    // Set the start and end points
-    grid[grid.size() - 1][0] = 0;
-    grid[0][grid[0].size() - 1] = 0;
+//     // Set the start and end points
+//     grid[grid.size() - 1][0] = 0;
+//     grid[0][grid[0].size() - 1] = 0;
 }
 
 // Function to count the number of wall neighbors around a cell
@@ -110,6 +185,82 @@ std::vector<std::vector<int>> applyCARules(std::vector<std::vector<int>> grid) {
     return newGrid;
 }
 
+
+std::string evolveLSystem(const std::string& axiom, const std::unordered_map<char, std::vector<std::string>>& rules, int iterations) {
+    std::string result = axiom;
+    for (int i = 0; i < iterations; ++i) {
+        std::string next;
+        for (char c : result) {
+            if (rules.find(c) != rules.end()) {
+                const std::vector<std::string>& possibleRules = rules.at(c);
+                next += possibleRules[rand() % possibleRules.size()]; // Randomly select a rule
+            } else {
+                next += c;
+            }
+        }
+        result = next;
+    }
+    return result;
+}
+
+void interpretLSystem(const std::string& instructions, std::vector<std::vector<int>>& grid, int startRow, int startCol) {
+    int rows = grid.size();
+    int cols = grid[0].size();
+    int direction = 0; // 0=up, 1=right, 2=down, 3=left
+    int row = startRow;
+    int col = startCol;
+
+    grid[row][col] = PATH;
+
+    for (char command : instructions) {
+        if (command == 'F') {
+            // Move in the current direction
+            if (direction == 0 && row > 0) row--;       // Move up
+            else if (direction == 1 && col < cols - 1) col++; // Move right
+            else if (direction == 2 && row < rows - 1) row++; // Move down
+            else if (direction == 3 && col > 0) col--;       // Move left
+            grid[row][col] = PATH;
+        } else if (command == '+') {
+            direction = (direction + 1) % 4; // Turn right
+        } else if (command == '-') {
+            direction = (direction + 3) % 4; // Turn left
+        }
+    }
+}
+
+// Function to find the first open cell (PATH) from the bottom-left of the grid
+sf::Vector2f findStartingPosition(const std::vector<std::vector<int>>& gridColors, int rows, int cols) {
+    // Start from the bottom row and move upwards in the leftmost column (column 0)
+    std::queue<Cell> q;
+    q.push(Cell(rows - 1, 0)); // Start from the bottom-left corner
+
+    while (!q.empty()) {
+        Cell current = q.front();
+        q.pop();
+
+        if (gridColors[current.row][current.col] == PATH) {
+            return sf::Vector2f(current.col * GRID_SPACING, current.row * GRID_SPACING);
+        }
+
+        // Explore neighbors in BFS fashion
+        std::vector<Cell> neighbors = {
+            {current.row - 1, current.col}, // Up
+            {current.row + 1, current.col}, // Down
+            {current.row, current.col - 1}, // Left
+            {current.row, current.col + 1}  // Right
+        };
+
+        for (const Cell& neighbor : neighbors) {
+            if (neighbor.isInsideGrid(rows, cols)) {
+                q.push(neighbor);
+            }
+        }
+    }
+
+    // Default to top-left if no open cell is found
+    return sf::Vector2f(0, 0);
+}
+
 int main() {
     sf::RenderWindow window(sf::VideoMode(800, 800), "SFML Cellular Automata Maze");
 
@@ -120,30 +271,55 @@ int main() {
 
     srand(static_cast<unsigned>(time(0)));
 
-    // initializeGrid(gridColors, WALL_PROBABILITY);
+    // ------------------------------------ Cellular Automata Maze Generation ------------------------------------
+    initializeGrid(gridColors, WALL_PROBABILITY);
 
-    // Debugging: Print initial grid state
-    // std::cout << "Initial Grid:\n";
-    // for (auto row : gridColors) {
-    //     for (auto cell : row) std::cout << (cell == 1 ? "#" : ".");
-    //     std::cout << "\n";
-    // }
-    // std::cout << "\nApplying Cellular Automata...\n";
+    for (int i = 0; i < CA_STEPS; i++) {
+        gridColors = applyCARules(gridColors);
+    }
 
-    // for (int i = 0; i < CA_STEPS; i++) {
-    //     gridColors = applyCARules(gridColors);
+    // ------------------------------------ Drunk Walk Maze Generation ------------------------------------
+    // drunkWalk(gridColors, 30000);
 
-    //     // Debugging: Print each step to check if grid changes
-    //     std::cout << "Grid after step " << i + 1 << ":\n";
-    //     for (auto row : gridColors) {
-    //         for (auto cell : row) std::cout << (cell == 1 ? "#" : ".");
-    //         std::cout << "\n";
+    // ------------------------------------ Prim's Maze Generation ------------------------------------
+    // PrimMaze(gridColors);
+
+    // ------------------------------------ L-System Maze Generation ------------------------------------
+    // std::unordered_map<char, std::vector<std::string>> rules;
+    // rules['F'] = {"F+F-F-F+F", "F-F+F+F-F", "F-F-F+F+F"}; // Multiple rules for randomness
+    // rules['+'] = {"+", "-"}; // Turn right or left
+    // rules['-'] = {"-", "+"}; // Turn left or right
+
+    // // Generate the L-system string
+    // std::string axiom = "F";
+    // int iterations = 4; // Adjust based on the complexity you want
+
+    // for (int i = 0; i < 5 ; i++) {
+    //     std::string instructions = evolveLSystem(axiom, rules, iterations);
+    //     if(i == 0){
+    //         interpretLSystem(instructions, gridColors, rows - 1, 0);
     //     }
-    //     std::cout << "\n";
+    //     else{
+    //         // cjose start randomly
+    //         int row = rand() % rows;
+    //         int col = rand() % cols;
+    //         interpretLSystem(instructions, gridColors, row, col);
+    //     }
+        
     // }
 
-    drunkWalk(gridColors, 150000);
 
+    std::cout << "Maze generated!" << std::endl;
+    // ------------------------------------ Player Movement ------------------------------------
+    sf::RectangleShape player(sf::Vector2f(GRID_SPACING - 2, GRID_SPACING - 2));
+    player.setFillColor(sf::Color::Red);
+
+    sf::Vector2f playerPos = findStartingPosition(gridColors, rows, cols);
+    player.setPosition(playerPos);
+
+    std::cout << "Player starting position: " << playerPos.x << ", " << playerPos.y << std::endl;
+
+    float playerSpeed = GRID_SPACING / 10.0f;
 
     while (window.isOpen()) {
         sf::Event event;
@@ -152,10 +328,35 @@ int main() {
                 window.close();
         }
 
+        // Player movement with snapping to grid
+        sf::Vector2f playerNewPos = player.getPosition();
+
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) // Move up
+            playerNewPos.y -= GRID_SPACING;
+            // add sleep call in order to slow down the player movement for 200ms
+            usleep(10000); // Sleep for 20 milliseconds
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) // Move down
+            playerNewPos.y += GRID_SPACING;
+            usleep(10000); // Sleep for 20 milliseconds
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) // Move left
+            playerNewPos.x -= GRID_SPACING;
+            usleep(10000); // Sleep for 20 milliseconds
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) // Move right
+            playerNewPos.x += GRID_SPACING;
+            usleep(10000); // Sleep for 20 milliseconds
+
+        // Convert player position to grid coordinates for collision checking
+        int newRow = static_cast<int>(playerNewPos.y / GRID_SPACING);
+        int newCol = static_cast<int>(playerNewPos.x / GRID_SPACING);
+
+        // Ensure new position is within grid and check for wall collision
+        if (isInBounds(newRow, newCol, rows, cols) && gridColors[newRow][newCol] != WALL) {
+            player.setPosition(newCol * GRID_SPACING, newRow * GRID_SPACING); // Snap to grid position if no collision
+        }
+
         window.clear(sf::Color::White);
 
         sf::VertexArray grid(sf::Lines);
-
 
         // Draw grid lines
         for (int i = 0; i <= rows; ++i) {
@@ -173,12 +374,13 @@ int main() {
             for (int col = 0; col < cols; ++col) {
                 sf::RectangleShape cell(sf::Vector2f(GRID_SPACING - 1, GRID_SPACING - 1));
                 cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-                cell.setFillColor(gridColors[row][col] == 1 ? sf::Color::Black : sf::Color::White);
+                cell.setFillColor(gridColors[row][col] == PATH ? sf::Color::Black : sf::Color::White);
                 window.draw(cell);
             }
         }
 
         window.draw(grid);
+        window.draw(player);
         window.display();
     }
 
