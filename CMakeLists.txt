@@ -18,7 +18,7 @@ find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 # Find OpenGL package
 find_package(OpenGL REQUIRED)
 
-add_executable(MyGame src/main.cpp)
+add_executable(MyGame src/main.cpp src/mazegen.hpp src/mazegen.cpp)
 
 # Include ImGui folder
 # include_directories(${CMAKE_SOURCE_DIR}/imgui)
