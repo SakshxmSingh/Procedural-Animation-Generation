@@ -35,7 +35,18 @@ sf::Vector2f findStartingPosition(const std::vector<std::vector<int>>& gridColor
 }
 
 int main() {
+     // Create a window with a specific size
     sf::RenderWindow window(sf::VideoMode(800, 800), "SFML Procedural Maze Generation");
+
+    // Get the desktop resolution
+    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+
+    // Calculate the center position of the screen
+    int centerX = (desktop.width - window.getSize().x) / 2;
+    int centerY = (desktop.height - window.getSize().y) / 2;
+
+    // Set the window's position to the center of the screen
+    window.setPosition(sf::Vector2i(centerX, centerY));
 
     int rows = window.getSize().y / GRID_SPACING;
     int cols = window.getSize().x / GRID_SPACING;
@@ -43,7 +54,6 @@ int main() {
     std::vector<std::vector<int>> gridColors(rows, std::vector<int>(cols, 0));
 
     srand(static_cast<unsigned>(time(0)));
-
     // ------------------------------------ Cellular Automata Maze Generation ------------------------------------
     MazeGenerator* generator = new CellularAutomataGenerator(WALL_PROBABILITY, CA_STEPS);
 
