@@ -1,154 +1,227 @@
 #include <SFML/Graphics.hpp>
-#include "mazegen.hpp"
+#include <iostream>
+#include <cmath>
+#include <unistd.h>
+
+// Global body parts
+sf::CircleShape hip;
+sf::CircleShape leftKnee;
+sf::CircleShape rightKnee;
+sf::CircleShape leftFeet;
+sf::CircleShape rightFeet;
+
+int whichFeet = 0; // 0 for left and 1 for right
+std::string controlForm = "Key"; // "Mouse" or "Key"
+int loopCounter = 0;
+int onesteponefoot = 10;
+
+// Distance b/w 2 points
+float calculateDistance(const sf::Vector2f& p1, const sf::Vector2f& p2) {
+    return std::sqrt(std::pow(p2.x - p1.x, 2) + std::pow(p2.y - p1.y, 2));
+}
+
+// Function to compute a point using polar coordinates
+sf::Vector2f calculatePoint(const sf::Vector2f& origin, float distance, float angle) {
+    return sf::Vector2f(
+        origin.x + distance * std::cos(angle),
+        origin.y + distance * std::sin(angle)
+    );
+}
+
+sf::CircleShape createCircle(float radius, const sf::Color& color, const sf::Vector2f& position) {
+    sf::CircleShape circle(radius);
+    circle.setFillColor(color);
+    circle.setPosition(position - sf::Vector2f(radius, radius));
+    return circle;
+}
+
+void initializeBody(sf::Vector2f hipPosition, float thighLength, float calfLength) {
+    // Set hip position
+    hip = createCircle(20, sf::Color::Red, hipPosition);
+
+    // Adjust initial angles (in radians)
+    float leftThighAngle = M_PI / 2.0 + M_PI / 36.0; // 90 degrees + slight offset
+    float rightThighAngle = M_PI / 2.0 - M_PI / 36.0; // 90 degrees - slight offset
+
+    // Calculate knee positions
+    sf::Vector2f leftKneePosition = calculatePoint(hipPosition, thighLength, leftThighAngle);
+    sf::Vector2f rightKneePosition = calculatePoint(hipPosition, thighLength, rightThighAngle);
+
+    // Create knee circles
+    leftKnee = createCircle(8, sf::Color::Blue, leftKneePosition);
+    rightKnee = createCircle(8, sf::Color::Blue, rightKneePosition);
+
+    // Calculate feet positions
+    sf::Vector2f leftFeetPosition = calculatePoint(leftKneePosition, calfLength, leftThighAngle);
+    sf::Vector2f rightFeetPosition = calculatePoint(rightKneePosition, calfLength, rightThighAngle);
+
+    // Create feet circles
+    leftFeet = createCircle(6, sf::Color::Green, leftFeetPosition);
+    rightFeet = createCircle(6, sf::Color::Green, rightFeetPosition);
+}
 
 
-// Function to find the first open cell (PATH) from the bottom-left of the grid
-sf::Vector2f findStartingPosition(const std::vector<std::vector<int>>& gridColors, int rows, int cols) {
-    // Start from the bottom row and move upwards in the leftmost column (column 0)
-    std::queue<Cell> q;
-    q.push(Cell(rows - 1, 0)); // Start from the bottom-left corner
+// finding possible knee positions
+sf::Vector2f findKneePosition(const sf::Vector2f& hipCenter, const sf::Vector2f& feetCenter,
+                               float thighLength, float calfLength, const sf::Vector2f& currentKnee) {
+    sf::Vector2f hfVec = feetCenter - hipCenter;
+    float hfDistance = calculateDistance(hipCenter, feetCenter);
 
-    while (!q.empty()) {
-        Cell current = q.front();
-        q.pop();
+    if (hfDistance > (thighLength + calfLength) || hfDistance < std::abs(thighLength - calfLength)) {
+        //std::cout << "Hip and feet too close to too apart";
 
-        if (gridColors[current.row][current.col] == PATH) {
-            return sf::Vector2f(current.col * GRID_SPACING, current.row * GRID_SPACING);
+        if(whichFeet == 0){
+            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x+rightFeet.getPosition().x)/2,300));
+
+        }
+        if(whichFeet == 1){
+            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x+rightFeet.getPosition().x)/2,300));
+
         }
 
-        // Explore neighbors in BFS fashion
-        std::vector<Cell> neighbors = {
-            {current.row - 1, current.col}, // Up
-            {current.row + 1, current.col}, // Down
-            {current.row, current.col - 1}, // Left
-            {current.row, current.col + 1}  // Right
-        };
+        
+    }
 
-        for (const Cell& neighbor : neighbors) {
-            if (neighbor.isInsideGrid(rows, cols)) {
-                q.push(neighbor);
-            }
+    float d = hfDistance;
+    float a = (thighLength * thighLength - calfLength * calfLength + d * d) / (2 * d);
+    float h = std::sqrt(thighLength * thighLength - a * a);
+
+    sf::Vector2f midpoint = hipCenter + a * (hfVec / d);
+    sf::Vector2f perpendicularVec(-hfVec.y / d, hfVec.x / d);
+
+    sf::Vector2f knee1 = midpoint + h * perpendicularVec;
+    sf::Vector2f knee2 = midpoint - h * perpendicularVec;
+
+    float dist1 = calculateDistance(knee1, currentKnee);
+    float dist2 = calculateDistance(knee2, currentKnee);
+
+    return (dist1 < dist2) ? knee1 : knee2;
+}
+
+
+
+void drawLines(sf::RenderWindow& window, const sf::CircleShape& hip, const sf::CircleShape& leftKnee,
+               const sf::CircleShape& rightKnee, const sf::CircleShape& leftFeet, const sf::CircleShape& rightFeet) {
+    sf::VertexArray lines(sf::Lines, 8);
+
+    sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
+    sf::Vector2f leftKneeCenter = leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius());
+    sf::Vector2f rightKneeCenter = rightKnee.getPosition() + sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius());
+    sf::Vector2f leftFeetCenter = leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius());
+    sf::Vector2f rightFeetCenter = rightFeet.getPosition() + sf::Vector2f(rightFeet.getRadius(), rightFeet.getRadius());
+
+    lines[0].position = hipCenter; lines[1].position = leftKneeCenter;
+    lines[2].position = hipCenter; lines[3].position = rightKneeCenter;
+    lines[4].position = leftKneeCenter; lines[5].position = leftFeetCenter;
+    lines[6].position = rightKneeCenter; lines[7].position = rightFeetCenter;
+
+    window.draw(lines);
+}
+
+void handleDragging(sf::RenderWindow& window, sf::CircleShape* draggedObject, sf::Vector2f& offset,
+                    const sf::CircleShape& hip, sf::CircleShape& leftKnee, sf::CircleShape& rightKnee,
+                    sf::CircleShape& leftFeet, sf::CircleShape& rightFeet,
+                    float thighLength, float calfLength) {
+    if (draggedObject != nullptr) {
+        sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+        draggedObject->setPosition(mousePos - offset);
+
+        sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
+
+        if (draggedObject == &leftFeet) {
+            whichFeet = 0;
+            sf::Vector2f feetCenter = leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius());
+            sf::Vector2f currentKnee = leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius());
+            sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
+            leftKnee.setPosition(newKnee - sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius()));
+        } else if (draggedObject == &rightFeet) {
+            whichFeet = 1;
+            sf::Vector2f feetCenter = rightFeet.getPosition() + sf::Vector2f(rightFeet.getRadius(), rightFeet.getRadius());
+            sf::Vector2f currentKnee = rightKnee.getPosition() + sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius());
+            sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
+            rightKnee.setPosition(newKnee - sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius()));
         }
     }
-    // Default to top-left if no open cell is found
-    return sf::Vector2f(0, 0);
+}
+
+void handleKeyboardMovement(float moveStep, float thighLength, float calfLength) {
+    sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
+    sf::CircleShape* activeFeet = (whichFeet == 0) ? &leftFeet : &rightFeet;
+    sf::CircleShape* activeKnee = (whichFeet == 0) ? &leftKnee : &rightKnee;
+
+    sf::Vector2f feetCenter = activeFeet->getPosition() + sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius());
+    feetCenter.x += moveStep;
+
+    sf::Vector2f currentKnee = activeKnee->getPosition() + sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius());
+    sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
+
+    activeFeet->setPosition(feetCenter - sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius()));
+    activeKnee->setPosition(newKnee - sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius()));
+    //whichFeet = 1 - whichFeet; // Alternate feet
 }
 
 int main() {
-     // Create a window with a specific size
-    sf::RenderWindow window(sf::VideoMode(800, 800), "SFML Procedural Maze Generation");
 
-    // Get the desktop resolution
-    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-
-    // Calculate the center position of the screen
-    int centerX = (desktop.width - window.getSize().x) / 2;
-    int centerY = (desktop.height - window.getSize().y) / 2;
-
-    // Set the window's position to the center of the screen
-    window.setPosition(sf::Vector2i(centerX, centerY));
-
-    int rows = window.getSize().y / GRID_SPACING;
-    int cols = window.getSize().x / GRID_SPACING;
-
-    std::vector<std::vector<int>> gridColors(rows, std::vector<int>(cols, 0));
-
-    srand(static_cast<unsigned>(time(0)));
-    // ------------------------------------ Cellular Automata Maze Generation ------------------------------------
-    MazeGenerator* generator = new CellularAutomataGenerator(WALL_PROBABILITY, CA_STEPS);
-
-    // ------------------------------------ Drunk Walk Maze Generation ------------------------------------
-    // MazeGenerator* generator = new DrunkWalkGenerator(DRUNK_WALK_STEPS);
-
-    // ------------------------------------ Prim's Maze Generation ------------------------------------
-    // MazeGenerator* generator = new PrimGenerator();
-
-    // ------------------------------------ L-System Maze Generation ------------------------------------
-    // MazeGenerator* generator = new LSystemGenerator(L_SYSTEM_ITERATIONS, L_SYSTEM_STARTPOINTS);
-
-
-    generator->generateMaze(gridColors, rows, cols);
-    std::cout << "Maze generated!" << std::endl;
-
-    // print the maze
-    // for (int row = 0; row < rows; ++row) {
-    //     for (int col = 0; col < cols; ++col) {
-    //         std::cout << (gridColors[row][col] == WALL ? "#" : " ");
-    //     }
-    //     std::cout << std::endl;
+    // loopCounter++; // to count loops
+    // int loopy = loopCounter%onesteponefoot;
+    // if (loopy!=loopCounter){
+    //     whichFeet = 1-whichFeet;
     // }
 
-    // ------------------------------------ Player Movement ------------------------------------
-    sf::RectangleShape player(sf::Vector2f(GRID_SPACING - 2, GRID_SPACING - 2));
-    player.setFillColor(sf::Color::Red);
+    sf::RenderWindow window(sf::VideoMode(800, 800), "Simple SFML Window");
+    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+    window.setPosition(sf::Vector2i((desktop.width - window.getSize().x) / 2, (desktop.height - window.getSize().y) / 2));
 
-    sf::Vector2f playerPos = findStartingPosition(gridColors, rows, cols);
-    player.setPosition(playerPos);
+    // Define hip position, thigh length, and calf length
+    sf::Vector2f hipPosition = {400, 300};
+    float thighLength = 50.0f; // Length of the thigh
+    float calfLength = 60.0f;  // Length of the calf
 
-    std::cout << "Player starting position: " << playerPos.x << ", " << playerPos.y << std::endl;
+    // Initialize body parts
+    initializeBody(hipPosition, thighLength, calfLength);
 
-    float playerSpeed = GRID_SPACING / 10.0f;
+    sf::CircleShape* draggedObject = nullptr;
+    sf::Vector2f offset;
 
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
-        }
 
-        // Player movement with snapping to grid
-        sf::Vector2f playerNewPos = player.getPosition();
-
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)) // Move up
-            playerNewPos.y -= GRID_SPACING;
-            // add sleep call in order to slow down the player movement for 200ms
-            usleep(10000); // Sleep for 20 milliseconds
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) // Move down
-            playerNewPos.y += GRID_SPACING;
-            usleep(10000); // Sleep for 20 milliseconds
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) // Move left
-            playerNewPos.x -= GRID_SPACING;
-            usleep(10000); // Sleep for 20 milliseconds
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) // Move right
-            playerNewPos.x += GRID_SPACING;
-            usleep(10000); // Sleep for 20 milliseconds
-
-        // Convert player position to grid coordinates for collision checking
-        int newRow = static_cast<int>(playerNewPos.y / GRID_SPACING);
-        int newCol = static_cast<int>(playerNewPos.x / GRID_SPACING);
-
-        // Ensure new position is within grid and check for wall collision
-        if (isInBounds(newRow, newCol, rows, cols) && gridColors[newRow][newCol] != WALL) {
-            player.setPosition(newCol * GRID_SPACING, newRow * GRID_SPACING); // Snap to grid position if no collision
-        }
-
-        window.clear(sf::Color::White);
-
-        sf::VertexArray grid(sf::Lines);
-
-        // Draw grid lines
-        for (int i = 0; i <= rows; ++i) {
-            grid.append(sf::Vertex(sf::Vector2f(0, i * GRID_SPACING), sf::Color::Black));
-            grid.append(sf::Vertex(sf::Vector2f(cols * GRID_SPACING, i * GRID_SPACING), sf::Color::Black));
-        }
-        for (int i = 0; i <= cols; ++i) {
-            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, 0), sf::Color::Black));
-            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, rows * GRID_SPACING), sf::Color::Black));
-        }
-
-
-        // Draw colored cells
-        for (int row = 0; row < rows; ++row) {
-            for (int col = 0; col < cols; ++col) {
-                sf::RectangleShape cell(sf::Vector2f(GRID_SPACING - 1, GRID_SPACING - 1));
-                cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-                cell.setFillColor(gridColors[row][col] == PATH ? sf::Color::Black : sf::Color::White);
-                window.draw(cell);
+            if (controlForm == "Mouse" && event.type == sf::Event::MouseButtonPressed) {
+                sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+                if (hip.getGlobalBounds().contains(mousePos)) draggedObject = &hip, offset = mousePos - hip.getPosition();
+                else if (leftFeet.getGlobalBounds().contains(mousePos)) draggedObject = &leftFeet, offset = mousePos - leftFeet.getPosition();
+                else if (rightFeet.getGlobalBounds().contains(mousePos)) draggedObject = &rightFeet, offset = mousePos - rightFeet.getPosition();
+            }
+            if (controlForm == "Mouse" && event.type == sf::Event::MouseButtonReleased) {
+                draggedObject = nullptr;
             }
         }
 
-        window.draw(grid);
-        window.draw(player);
+        loopCounter++;
+        if (loopCounter % onesteponefoot == 0) {
+            whichFeet = 1 - whichFeet; // Alternate feet every `onesteponefoot` loops
+        }
+
+        if (controlForm == "Key") {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) handleKeyboardMovement(-5.f, thighLength, calfLength);
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) handleKeyboardMovement(5.f, thighLength, calfLength);
+            usleep(15000);
+        }
+
+        if (controlForm == "Mouse") {
+            handleDragging(window, draggedObject, offset, hip, leftKnee, rightKnee, leftFeet, rightFeet, thighLength, calfLength);
+        }
+
+        window.clear();
+        drawLines(window, hip, leftKnee, rightKnee, leftFeet, rightFeet);
+        window.draw(hip);
+        window.draw(leftKnee);
+        window.draw(rightKnee);
+        window.draw(leftFeet);
+        window.draw(rightFeet);
         window.display();
     }
 
