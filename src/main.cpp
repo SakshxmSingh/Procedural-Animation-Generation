@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cmath>
 #include <unistd.h>
+#include <cstdlib> // For rand()
+#include <ctime>   // For seeding rand()
 
 // Global body parts
 sf::CircleShape hip;
@@ -10,10 +12,13 @@ sf::CircleShape rightKnee;
 sf::CircleShape leftFeet;
 sf::CircleShape rightFeet;
 
+// upper body
+sf::CircleShape chest;
+
 int whichFeet = 0; // 0 for left and 1 for right
 std::string controlForm = "Key"; // "Mouse" or "Key"
 int loopCounter = 0;
-int onesteponefoot = 10;
+int onesteponefoot = 25;
 
 // Distance b/w 2 points
 float calculateDistance(const sf::Vector2f& p1, const sf::Vector2f& p2) {
@@ -37,7 +42,7 @@ sf::CircleShape createCircle(float radius, const sf::Color& color, const sf::Vec
 
 void initializeBody(sf::Vector2f hipPosition, float thighLength, float calfLength) {
     // Set hip position
-    hip = createCircle(20, sf::Color::Red, hipPosition);
+    hip = createCircle(15, sf::Color::White, hipPosition);
 
     // Adjust initial angles (in radians)
     float leftThighAngle = M_PI / 2.0 + M_PI / 36.0; // 90 degrees + slight offset
@@ -56,8 +61,12 @@ void initializeBody(sf::Vector2f hipPosition, float thighLength, float calfLengt
     sf::Vector2f rightFeetPosition = calculatePoint(rightKneePosition, calfLength, rightThighAngle);
 
     // Create feet circles
-    leftFeet = createCircle(6, sf::Color::Green, leftFeetPosition);
-    rightFeet = createCircle(6, sf::Color::Green, rightFeetPosition);
+    leftFeet = createCircle(6, sf::Color::Cyan, leftFeetPosition);
+    rightFeet = createCircle(6, sf::Color::Cyan, rightFeetPosition);
+
+    sf::Vector2f chestPosition = sf::Vector2f(hipPosition.x, hipPosition.y-50);
+
+    chest = createCircle(10, sf::Color::Cyan, chestPosition);
 }
 
 
@@ -70,16 +79,20 @@ sf::Vector2f findKneePosition(const sf::Vector2f& hipCenter, const sf::Vector2f&
     if (hfDistance > (thighLength + calfLength) || hfDistance < std::abs(thighLength - calfLength)) {
         //std::cout << "Hip and feet too close to too apart";
 
-        if(whichFeet == 0){
-            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x+rightFeet.getPosition().x)/2,300));
+        if (whichFeet == 0) {
+            // Set hip position
+            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x + rightFeet.getPosition().x) / 2, 300));
 
-        }
-        if(whichFeet == 1){
-            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x+rightFeet.getPosition().x)/2,300));
-
+            
         }
 
-        
+        if (whichFeet == 1) {
+            // Set hip position
+            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x + rightFeet.getPosition().x) / 2, 300));
+
+            
+        }
+                
     }
 
     float d = hfDistance;
@@ -100,11 +113,16 @@ sf::Vector2f findKneePosition(const sf::Vector2f& hipCenter, const sf::Vector2f&
 
 
 
-void drawLines(sf::RenderWindow& window, const sf::CircleShape& hip, const sf::CircleShape& leftKnee,
-               const sf::CircleShape& rightKnee, const sf::CircleShape& leftFeet, const sf::CircleShape& rightFeet) {
+#include <cstdlib> // For rand()
+#include <ctime>   // For seeding rand()
+
+void drawLines(sf::RenderWindow& window, const sf::CircleShape& chest, const sf::CircleShape& hip, 
+               const sf::CircleShape& leftKnee, const sf::CircleShape& rightKnee, 
+               const sf::CircleShape& leftFeet, const sf::CircleShape& rightFeet) {
     sf::VertexArray lines(sf::Lines, 8);
 
     sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
+    sf::Vector2f chestCenter = chest.getPosition() + sf::Vector2f(chest.getRadius(), chest.getRadius());
     sf::Vector2f leftKneeCenter = leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius());
     sf::Vector2f rightKneeCenter = rightKnee.getPosition() + sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius());
     sf::Vector2f leftFeetCenter = leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius());
@@ -115,8 +133,51 @@ void drawLines(sf::RenderWindow& window, const sf::CircleShape& hip, const sf::C
     lines[4].position = leftKneeCenter; lines[5].position = leftFeetCenter;
     lines[6].position = rightKneeCenter; lines[7].position = rightFeetCenter;
 
+    // Draw leg lines
     window.draw(lines);
+
+    // Define a smoothing factor for control point transitions
+const float smoothingFactor = 0.005f;
+
+// Generate new random target positions for the control points
+float randomX1 = chestCenter.x - 50.0f + static_cast<float>(rand()) / RAND_MAX * 100.0f; // Random x [-50, 50]
+float randomX2 = chestCenter.x - 50.0f + static_cast<float>(rand()) / RAND_MAX * 100.0f; // Random x [-50, 50]
+float randomY = (hipCenter.y + chestCenter.y) / 2.0f; // Fixed y-coordinate (arithmetic mean)
+
+sf::Vector2f targetControlPoint1(randomX1, randomY);
+sf::Vector2f targetControlPoint2(randomX2, randomY);
+
+// Smoothly interpolate control points
+static sf::Vector2f controlPoint1 = targetControlPoint1; // Initialize static control points
+static sf::Vector2f controlPoint2 = targetControlPoint2;
+
+controlPoint1 += smoothingFactor * (targetControlPoint1 - controlPoint1);
+controlPoint2 += smoothingFactor * (targetControlPoint2 - controlPoint2);
+
+// Generate Bezier curve points
+sf::VertexArray bezierCurve(sf::LineStrip, 100); // 100 points for smoothness
+
+for (int i = 0; i < 100; ++i) {
+    float t = i / 99.0f; // Normalize t to [0, 1]
+    float u = 1 - t;
+
+    // Calculate cubic Bezier curve point
+    sf::Vector2f point = 
+        u * u * u * chestCenter + 
+        3 * u * u * t * controlPoint1 + 
+        3 * u * t * t * controlPoint2 + 
+        t * t * t * hipCenter;
+
+    bezierCurve[i].position = point;
+    bezierCurve[i].color = sf::Color::Cyan; // Optional: Set curve color
 }
+
+// Draw the Bezier curve
+window.draw(bezierCurve);
+
+}
+
+
 
 void handleDragging(sf::RenderWindow& window, sf::CircleShape* draggedObject, sf::Vector2f& offset,
                     const sf::CircleShape& hip, sf::CircleShape& leftKnee, sf::CircleShape& rightKnee,
@@ -206,8 +267,20 @@ int main() {
         }
 
         if (controlForm == "Key") {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) handleKeyboardMovement(-5.f, thighLength, calfLength);
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) handleKeyboardMovement(5.f, thighLength, calfLength);
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) handleKeyboardMovement(-2.f, thighLength, calfLength);
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) handleKeyboardMovement(2.f, thighLength, calfLength);
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::E)){
+                chest.setPosition(sf::Vector2f(chest.getPosition().x+1,chest.getPosition().y-1));
+            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)){
+                chest.setPosition(sf::Vector2f(chest.getPosition().x+1,chest.getPosition().y+1));
+            }
+             if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)){
+                chest.setPosition(sf::Vector2f(chest.getPosition().x-1,chest.getPosition().y-1));
+            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)){
+                chest.setPosition(sf::Vector2f(chest.getPosition().x-1,chest.getPosition().y+1));
+            }
             usleep(15000);
         }
 
@@ -215,13 +288,38 @@ int main() {
             handleDragging(window, draggedObject, offset, hip, leftKnee, rightKnee, leftFeet, rightFeet, thighLength, calfLength);
         }
 
+        // Add randomness to chest position
+       // Define a smoothing factor (0.0 to 1.0, closer to 1.0 for faster transitions)
+const float smoothingFactor = 0.01f;
+
+// Calculate the target position with randomness
+float randomX = ((rand() % 42) - 20); // Random x offset in range [-20, 20]
+float randomY = ((rand() % 42) - 20); // Random y offset in range [-20, 20]
+sf::Vector2f targetChestPosition(
+    (leftFeet.getPosition().x + rightFeet.getPosition().x) / 2 + randomX,
+    250 + randomY
+);
+
+// Get the current position of the chest
+sf::Vector2f currentChestPosition = chest.getPosition();
+
+// Interpolate towards the target position
+sf::Vector2f smoothChestPosition = currentChestPosition + smoothingFactor * (targetChestPosition - currentChestPosition);
+
+// Update the chest position
+chest.setPosition(smoothChestPosition);
+
+
         window.clear();
-        drawLines(window, hip, leftKnee, rightKnee, leftFeet, rightFeet);
+        drawLines(window, chest, hip, leftKnee, rightKnee, leftFeet, rightFeet);
         window.draw(hip);
         window.draw(leftKnee);
         window.draw(rightKnee);
         window.draw(leftFeet);
         window.draw(rightFeet);
+
+
+        window.draw(chest);
         window.display();
     }
 
