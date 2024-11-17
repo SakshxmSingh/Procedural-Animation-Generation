@@ -1,186 +1,172 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <cmath>
-#include "mazegen.hpp"
 
-
-// Function to calculate the distance between two points
+// Distance b/w 2 points
 float calculateDistance(const sf::Vector2f& p1, const sf::Vector2f& p2) {
     return std::sqrt(std::pow(p2.x - p1.x, 2) + std::pow(p2.y - p1.y, 2));
 }
 
+// finding possible knee positions
+sf::Vector2f findKneePosition(const sf::Vector2f& hipCenter, const sf::Vector2f& feetCenter,
+                               float thighLength, float calfLength, const sf::Vector2f& currentKnee) {
+    // Vector from hip to feet
+    sf::Vector2f hfVec = feetCenter - hipCenter;
+    float hfDistance = calculateDistance(hipCenter, feetCenter);
+
+    // Check if the position is valid
+    if (hfDistance > (thighLength + calfLength) || hfDistance < std::abs(thighLength - calfLength)) {
+        throw std::invalid_argument("Invalid feet position: Constraints cannot be satisfied.");
+    }
+
+    // Use the circle intersection formula to calculate possible knee positions
+    float d = hfDistance;
+    float a = (thighLength * thighLength - calfLength * calfLength + d * d) / (2 * d);
+    float h = std::sqrt(thighLength * thighLength - a * a);
+
+    // Midpoint on the line from hip to feet
+    sf::Vector2f midpoint = hipCenter + a * (hfVec / d);
+
+    // Perpendicular vector for the knee
+    sf::Vector2f perpendicularVec(-hfVec.y / d, hfVec.x / d);
+
+    // Two possible knee positions
+    sf::Vector2f knee1 = midpoint + h * perpendicularVec;
+    sf::Vector2f knee2 = midpoint - h * perpendicularVec;
+
+    // Choose the knee position closest to the current knee position
+    float dist1 = calculateDistance(knee1, currentKnee);
+    float dist2 = calculateDistance(knee2, currentKnee);
+
+    return (dist1 < dist2) ? knee1 : knee2;
+}
+
+// Function to create a circle with given parameters
+sf::CircleShape createCircle(float radius, const sf::Color& color, const sf::Vector2f& position) {
+    sf::CircleShape circle(radius);
+    circle.setFillColor(color);
+    circle.setPosition(position - sf::Vector2f(radius, radius));
+    return circle;
+}
+
+// Function to draw the connecting lines
+void drawLines(sf::RenderWindow& window, const sf::CircleShape& hip, const sf::CircleShape& leftKnee, const sf::CircleShape& rightKnee,
+               const sf::CircleShape& leftFeet, const sf::CircleShape& rightFeet) {
+    sf::VertexArray lines(sf::Lines, 8);
+
+    // Define the lines connecting body parts
+    sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
+    sf::Vector2f leftKneeCenter = leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius());
+    sf::Vector2f rightKneeCenter = rightKnee.getPosition() + sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius());
+    sf::Vector2f leftFeetCenter = leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius());
+    sf::Vector2f rightFeetCenter = rightFeet.getPosition() + sf::Vector2f(rightFeet.getRadius(), rightFeet.getRadius());
+
+    // Connect hip to knees
+    lines[0].position = hipCenter; lines[0].color = sf::Color::Red;
+    lines[1].position = leftKneeCenter; lines[1].color = sf::Color::Red;
+
+    lines[2].position = hipCenter; lines[2].color = sf::Color::Red;
+    lines[3].position = rightKneeCenter; lines[3].color = sf::Color::Red;
+
+    // Connect knees to feet
+    lines[4].position = leftKneeCenter; lines[4].color = sf::Color::Red;
+    lines[5].position = leftFeetCenter; lines[5].color = sf::Color::Red;
+
+    lines[6].position = rightKneeCenter; lines[6].color = sf::Color::Red;
+    lines[7].position = rightFeetCenter; lines[7].color = sf::Color::Red;
+
+    window.draw(lines);
+}
+
+// Handle dragging logic
+void handleDragging(sf::RenderWindow& window, sf::CircleShape* draggedObject, sf::Vector2f& offset,
+                    const sf::CircleShape& hip, sf::CircleShape& leftKnee, sf::CircleShape& rightKnee,
+                    sf::CircleShape& leftFeet, sf::CircleShape& rightFeet,
+                    float thighLength, float calfLength) {
+    if (draggedObject != nullptr) {
+        // Update the dragged object position based on mouse
+        sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+        draggedObject->setPosition(mousePos - offset);
+
+        // Get positions of other key points
+        sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
+
+        if (draggedObject == &leftFeet) {
+            sf::Vector2f feetCenter = leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius());
+            sf::Vector2f currentKnee = leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius());
+
+            // Find the new knee position
+            sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
+
+            // Update the knee's position
+            leftKnee.setPosition(newKnee - sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius()));
+        } else if (draggedObject == &rightFeet) {
+            sf::Vector2f feetCenter = rightFeet.getPosition() + sf::Vector2f(rightFeet.getRadius(), rightFeet.getRadius());
+            sf::Vector2f currentKnee = rightKnee.getPosition() + sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius());
+
+            // Find the new knee position
+            sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
+
+            // Update the knee's position
+            rightKnee.setPosition(newKnee - sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius()));
+        }
+    }
+}
+
 int main() {
-    // Create a window with a specific size
     sf::RenderWindow window(sf::VideoMode(800, 800), "Simple SFML Window");
-
-    // Get the desktop resolution and center the window
     sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-    int centerX = (desktop.width - window.getSize().x) / 2;
-    int centerY = (desktop.height - window.getSize().y) / 2;
-    window.setPosition(sf::Vector2i(centerX, centerY));
+    window.setPosition(sf::Vector2i((desktop.width - window.getSize().x) / 2, (desktop.height - window.getSize().y) / 2));
 
-    // Initialize the body part positions
-    const float HIP_Y = 300.0f;
-    const float KNEE_Y = HIP_Y + GRID_SPACING * 2;  // Knee is 2 grid spaces below the hip
-    const float FEET_Y = KNEE_Y + GRID_SPACING * 2;  // Feet are 2 grid spaces below the knees
+    // body parts
+    sf::CircleShape hip = createCircle(20, sf::Color::Red, {400, 300});
+    sf::CircleShape leftKnee = createCircle(8, sf::Color::Blue, {360, 340});
+    sf::CircleShape rightKnee = createCircle(8, sf::Color::Blue, {440, 340});
+    sf::CircleShape leftFeet = createCircle(6, sf::Color::Green, {360, 380});
+    sf::CircleShape rightFeet = createCircle(6, sf::Color::Green, {440, 380});
 
-    sf::CircleShape hip(10);
-    hip.setFillColor(sf::Color::Red);
-    hip.setPosition(400 - hip.getRadius(), HIP_Y - hip.getRadius());  // Position hip
+    // Calculate lengths
+    float thighLength = calculateDistance(hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius()),
+                                          leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius()));
+    float calfLength = calculateDistance(leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius()),
+                                          leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius()));
 
-    sf::CircleShape leftKnee(8), rightKnee(8);
-    leftKnee.setFillColor(sf::Color::Blue);
-    rightKnee.setFillColor(sf::Color::Blue);
-    leftKnee.setPosition(400 - GRID_SPACING - leftKnee.getRadius(), KNEE_Y - leftKnee.getRadius());  // Left knee
-    rightKnee.setPosition(400 + GRID_SPACING - rightKnee.getRadius(), KNEE_Y - rightKnee.getRadius());  // Right knee
+    std::cout << "Thigh Length: " << thighLength << "\n";
+    std::cout << "Calf Length: " << calfLength << "\n";
 
-    sf::CircleShape leftFeet(6), rightFeet(6);
-    leftFeet.setFillColor(sf::Color::Green);
-    rightFeet.setFillColor(sf::Color::Green);
-    leftFeet.setPosition(400 - GRID_SPACING - leftFeet.getRadius(), FEET_Y - leftFeet.getRadius());  // Left feet
-    rightFeet.setPosition(400 + GRID_SPACING - rightFeet.getRadius(), FEET_Y - rightFeet.getRadius());  // Right feet
-
-    // Define calf and thigh lengths
-    float calfLengthLeft = calculateDistance(leftKnee.getPosition(), leftFeet.getPosition());
-    float calfLengthRight = calculateDistance(rightKnee.getPosition(), rightFeet.getPosition());
-    float thighLengthLeft = calculateDistance(hip.getPosition(), leftKnee.getPosition());
-    float thighLengthRight = calculateDistance(hip.getPosition(), rightKnee.getPosition());
-
-    bool moveLeftFoot = true;  // Toggle between moving left and right foot
+    // Dragging state variables
+    sf::CircleShape* draggedObject = nullptr;
+    sf::Vector2f offset;
 
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
-        }
 
-        // Key press handling for foot movement (Right movement with D, Left movement with A)
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
-            if (moveLeftFoot) {
-                // Move left foot first (right movement)
-                sf::Vector2f leftFeetPos = leftFeet.getPosition();
-                leftFeetPos.x += GRID_SPACING;  // Move left foot right
-                leftFeet.setPosition(leftFeetPos.x, leftFeetPos.y);
+            if (event.type == sf::Event::MouseButtonPressed) {
+                sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
+                if (hip.getGlobalBounds().contains(mousePos)) draggedObject = &hip, offset = mousePos - hip.getPosition();
+                else if (leftKnee.getGlobalBounds().contains(mousePos)) draggedObject = &leftKnee, offset = mousePos - leftKnee.getPosition();
+                else if (rightKnee.getGlobalBounds().contains(mousePos)) draggedObject = &rightKnee, offset = mousePos - rightKnee.getPosition();
+                else if (leftFeet.getGlobalBounds().contains(mousePos)) draggedObject = &leftFeet, offset = mousePos - leftFeet.getPosition();
+                else if (rightFeet.getGlobalBounds().contains(mousePos)) draggedObject = &rightFeet, offset = mousePos - rightFeet.getPosition();
+            }
 
-                // Update left knee to maintain calf length
-                sf::Vector2f leftKneePos = leftKnee.getPosition();
-                float calfDistance = calculateDistance(leftKneePos, leftFeet.getPosition());
-                float calfRatio = calfLengthLeft / calfDistance;
-                leftKneePos.x = leftFeet.getPosition().x - (leftFeet.getPosition().x - leftKneePos.x) * calfRatio;
-                leftKneePos.y = leftFeet.getPosition().y - (leftFeet.getPosition().y - leftKneePos.y) * calfRatio;
-                leftKnee.setPosition(leftKneePos.x - leftKnee.getRadius(), leftKneePos.y - leftKnee.getRadius());
-
-                // Update hip to maintain thigh length
-                sf::Vector2f hipPos = hip.getPosition();
-                float thighDistance = calculateDistance(hipPos, leftKnee.getPosition());
-                float thighRatio = thighLengthLeft / thighDistance;
-                hipPos.x = leftKnee.getPosition().x - (leftKnee.getPosition().x - hipPos.x) * thighRatio;
-                hipPos.y = leftKnee.getPosition().y - (leftKnee.getPosition().y - hipPos.y) * thighRatio;
-                hip.setPosition(hipPos.x - hip.getRadius(), hipPos.y - hip.getRadius());
-
-                moveLeftFoot = false;  // Next move will be for the right foot
-            } else {
-                // Move right foot (right movement)
-                sf::Vector2f rightFeetPos = rightFeet.getPosition();
-                rightFeetPos.x += GRID_SPACING;  // Move right foot right
-                rightFeet.setPosition(rightFeetPos.x, rightFeetPos.y);
-
-                // Update right knee to maintain calf length
-                sf::Vector2f rightKneePos = rightKnee.getPosition();
-                float calfDistance = calculateDistance(rightKneePos, rightFeet.getPosition());
-                float calfRatio = calfLengthRight / calfDistance;
-                rightKneePos.x = rightFeet.getPosition().x - (rightFeet.getPosition().x - rightKneePos.x) * calfRatio;
-                rightKneePos.y = rightFeet.getPosition().y - (rightFeet.getPosition().y - rightKneePos.y) * calfRatio;
-                rightKnee.setPosition(rightKneePos.x - rightKnee.getRadius(), rightKneePos.y - rightKnee.getRadius());
-
-                // Update hip to maintain thigh length
-                sf::Vector2f hipPos = hip.getPosition();
-                float thighDistance = calculateDistance(hipPos, rightKnee.getPosition());
-                float thighRatio = thighLengthRight / thighDistance;
-                hipPos.x = rightKnee.getPosition().x - (rightKnee.getPosition().x - hipPos.x) * thighRatio;
-                hipPos.y = rightKnee.getPosition().y - (rightKnee.getPosition().y - hipPos.y) * thighRatio;
-                hip.setPosition(hipPos.x - hip.getRadius(), hipPos.y - hip.getRadius());
-
-                moveLeftFoot = true;  // Next move will be for the left foot
+            if (event.type == sf::Event::MouseButtonReleased) {
+                draggedObject = nullptr;
             }
         }
 
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
-            if (!moveLeftFoot) {
-                // Move left foot first (left movement)
-                sf::Vector2f leftFeetPos = leftFeet.getPosition();
-                leftFeetPos.x -= GRID_SPACING;  // Move left foot left
-                leftFeet.setPosition(leftFeetPos.x, leftFeetPos.y);
+        handleDragging(window, draggedObject, offset, hip, leftKnee, rightKnee, leftFeet, rightFeet, thighLength, calfLength);
 
-                // Update left knee to maintain calf length
-                sf::Vector2f leftKneePos = leftKnee.getPosition();
-                float calfDistance = calculateDistance(leftKneePos, leftFeet.getPosition());
-                float calfRatio = calfLengthLeft / calfDistance;
-                leftKneePos.x = leftFeet.getPosition().x - (leftFeet.getPosition().x - leftKneePos.x) * calfRatio;
-                leftKneePos.y = leftFeet.getPosition().y - (leftFeet.getPosition().y - leftKneePos.y) * calfRatio;
-                leftKnee.setPosition(leftKneePos.x - leftKnee.getRadius(), leftKneePos.y - leftKnee.getRadius());
-
-                // Update hip to maintain thigh length
-                sf::Vector2f hipPos = hip.getPosition();
-                float thighDistance = calculateDistance(hipPos, leftKnee.getPosition());
-                float thighRatio = thighLengthLeft / thighDistance;
-                hipPos.x = leftKnee.getPosition().x - (leftKnee.getPosition().x - hipPos.x) * thighRatio;
-                hipPos.y = leftKnee.getPosition().y - (leftKnee.getPosition().y - hipPos.y) * thighRatio;
-                hip.setPosition(hipPos.x - hip.getRadius(), hipPos.y - hip.getRadius());
-
-                moveLeftFoot = true;  // Next move will be for the right foot
-            } else {
-                // Move right foot (left movement)
-                sf::Vector2f rightFeetPos = rightFeet.getPosition();
-                rightFeetPos.x -= GRID_SPACING;  // Move right foot left
-                rightFeet.setPosition(rightFeetPos.x, rightFeetPos.y);
-
-                // Update right knee to maintain calf length
-                sf::Vector2f rightKneePos = rightKnee.getPosition();
-                float calfDistance = calculateDistance(rightKneePos, rightFeet.getPosition());
-                float calfRatio = calfLengthRight / calfDistance;
-                rightKneePos.x = rightFeet.getPosition().x - (rightFeet.getPosition().x - rightKneePos.x) * calfRatio;
-                rightKneePos.y = rightFeet.getPosition().y - (rightFeet.getPosition().y - rightKneePos.y) * calfRatio;
-                rightKnee.setPosition(rightKneePos.x - rightKnee.getRadius(), rightKneePos.y - rightKnee.getRadius());
-
-                // Update hip to maintain thigh length
-                sf::Vector2f hipPos = hip.getPosition();
-                float thighDistance = calculateDistance(hipPos, rightKnee.getPosition());
-                float thighRatio = thighLengthRight / thighDistance;
-                hipPos.x = rightKnee.getPosition().x - (rightKnee.getPosition().x - hipPos.x) * thighRatio;
-                hipPos.y = rightKnee.getPosition().y - (rightKnee.getPosition().y - hipPos.y) * thighRatio;
-                hip.setPosition(hipPos.x - hip.getRadius(), hipPos.y - hip.getRadius());
-
-                moveLeftFoot = false;  // Next move will be for the left foot
-            }
-        }
-
-        // Clear the window
         window.clear(sf::Color::White);
-
-        // Draw grid lines
-        sf::VertexArray grid(sf::Lines);
-        int rows = window.getSize().y / GRID_SPACING;
-        int cols = window.getSize().x / GRID_SPACING;
-        for (int i = 0; i <= rows; ++i) {
-            grid.append(sf::Vertex(sf::Vector2f(0, i * GRID_SPACING), sf::Color::Black));
-            grid.append(sf::Vertex(sf::Vector2f(cols * GRID_SPACING, i * GRID_SPACING), sf::Color::Black));
-        }
-        for (int i = 0; i <= cols; ++i) {
-            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, 0), sf::Color::Black));
-            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, rows * GRID_SPACING), sf::Color::Black));
-        }
-        window.draw(grid);
-
-        // Draw the body parts
+        drawLines(window, hip, leftKnee, rightKnee, leftFeet, rightFeet);
         window.draw(hip);
         window.draw(leftKnee);
         window.draw(rightKnee);
         window.draw(leftFeet);
         window.draw(rightFeet);
-
-        // Display everything
         window.display();
     }
 
