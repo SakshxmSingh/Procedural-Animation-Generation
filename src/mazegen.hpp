@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include <queue>
 #include <unistd.h>
+#include <cmath>
 
 #define GRID_SPACING 10 // Size of each cell (40x40 pixels)
 #define WALL_PROBABILITY 0.36 // Probability of a cell being a wall

@@ -1,325 +1,263 @@
-#include <SFML/Graphics.hpp>
-#include <iostream>
-#include <cmath>
-#include <unistd.h>
-#include <cstdlib> // For rand()
-#include <ctime>   // For seeding rand()
+#include "mazegen.hpp"
+#include "spider.hpp"
 
-// Global body parts
-sf::CircleShape hip;
-sf::CircleShape leftKnee;
-sf::CircleShape rightKnee;
-sf::CircleShape leftFeet;
-sf::CircleShape rightFeet;
-
-// upper body
-sf::CircleShape chest;
-
-int whichFeet = 0; // 0 for left and 1 for right
-std::string controlForm = "Key"; // "Mouse" or "Key"
-int loopCounter = 0;
-int onesteponefoot = 25;
-
-// Distance b/w 2 points
-float calculateDistance(const sf::Vector2f& p1, const sf::Vector2f& p2) {
-    return std::sqrt(std::pow(p2.x - p1.x, 2) + std::pow(p2.y - p1.y, 2));
-}
-
-// Function to compute a point using polar coordinates
-sf::Vector2f calculatePoint(const sf::Vector2f& origin, float distance, float angle) {
-    return sf::Vector2f(
-        origin.x + distance * std::cos(angle),
-        origin.y + distance * std::sin(angle)
-    );
-}
-
-sf::CircleShape createCircle(float radius, const sf::Color& color, const sf::Vector2f& position) {
-    sf::CircleShape circle(radius);
-    circle.setFillColor(color);
-    circle.setPosition(position - sf::Vector2f(radius, radius));
-    return circle;
-}
-
-void initializeBody(sf::Vector2f hipPosition, float thighLength, float calfLength) {
-    // Set hip position
-    hip = createCircle(15, sf::Color::White, hipPosition);
-
-    // Adjust initial angles (in radians)
-    float leftThighAngle = M_PI / 2.0 + M_PI / 36.0; // 90 degrees + slight offset
-    float rightThighAngle = M_PI / 2.0 - M_PI / 36.0; // 90 degrees - slight offset
-
-    // Calculate knee positions
-    sf::Vector2f leftKneePosition = calculatePoint(hipPosition, thighLength, leftThighAngle);
-    sf::Vector2f rightKneePosition = calculatePoint(hipPosition, thighLength, rightThighAngle);
-
-    // Create knee circles
-    leftKnee = createCircle(8, sf::Color::Blue, leftKneePosition);
-    rightKnee = createCircle(8, sf::Color::Blue, rightKneePosition);
-
-    // Calculate feet positions
-    sf::Vector2f leftFeetPosition = calculatePoint(leftKneePosition, calfLength, leftThighAngle);
-    sf::Vector2f rightFeetPosition = calculatePoint(rightKneePosition, calfLength, rightThighAngle);
-
-    // Create feet circles
-    leftFeet = createCircle(6, sf::Color::Cyan, leftFeetPosition);
-    rightFeet = createCircle(6, sf::Color::Cyan, rightFeetPosition);
-
-    sf::Vector2f chestPosition = sf::Vector2f(hipPosition.x, hipPosition.y-50);
-
-    chest = createCircle(10, sf::Color::Cyan, chestPosition);
-}
+#define MOVE_DURATION 60000 // Duration of player movement in microseconds
 
 
-// finding possible knee positions
-sf::Vector2f findKneePosition(const sf::Vector2f& hipCenter, const sf::Vector2f& feetCenter,
-                               float thighLength, float calfLength, const sf::Vector2f& currentKnee) {
-    sf::Vector2f hfVec = feetCenter - hipCenter;
-    float hfDistance = calculateDistance(hipCenter, feetCenter);
+// Function to find the first open cell (PATH) from the bottom-left of the grid
+sf::Vector2f findStartingPosition(const std::vector<std::vector<int>>& gridColors, int rows, int cols) {  //BFS
+    std::queue<Cell> q;
+    q.push(Cell(rows - 1, 0)); // Start from the bottom-left corner
 
-    if (hfDistance > (thighLength + calfLength) || hfDistance < std::abs(thighLength - calfLength)) {
-        //std::cout << "Hip and feet too close to too apart";
+    while (!q.empty()) {
+        Cell current = q.front();
+        q.pop();
 
-        if (whichFeet == 0) {
-            // Set hip position
-            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x + rightFeet.getPosition().x) / 2, 300));
-
-            
+        if (gridColors[current.row][current.col] == PATH) {
+            return sf::Vector2f(current.col * GRID_SPACING, current.row * GRID_SPACING);
         }
 
-        if (whichFeet == 1) {
-            // Set hip position
-            hip.setPosition(sf::Vector2f((leftFeet.getPosition().x + rightFeet.getPosition().x) / 2, 300));
+        std::vector<Cell> neighbors = {
+            {current.row - 1, current.col}, 
+            {current.row + 1, current.col}, 
+            {current.row, current.col - 1}, 
+            {current.row, current.col + 1}  
+        };
 
-            
-        }
-                
-    }
-
-    float d = hfDistance;
-    float a = (thighLength * thighLength - calfLength * calfLength + d * d) / (2 * d);
-    float h = std::sqrt(thighLength * thighLength - a * a);
-
-    sf::Vector2f midpoint = hipCenter + a * (hfVec / d);
-    sf::Vector2f perpendicularVec(-hfVec.y / d, hfVec.x / d);
-
-    sf::Vector2f knee1 = midpoint + h * perpendicularVec;
-    sf::Vector2f knee2 = midpoint - h * perpendicularVec;
-
-    float dist1 = calculateDistance(knee1, currentKnee);
-    float dist2 = calculateDistance(knee2, currentKnee);
-
-    return (dist1 < dist2) ? knee1 : knee2;
-}
-
-
-
-#include <cstdlib> // For rand()
-#include <ctime>   // For seeding rand()
-
-void drawLines(sf::RenderWindow& window, const sf::CircleShape& chest, const sf::CircleShape& hip, 
-               const sf::CircleShape& leftKnee, const sf::CircleShape& rightKnee, 
-               const sf::CircleShape& leftFeet, const sf::CircleShape& rightFeet) {
-    sf::VertexArray lines(sf::Lines, 8);
-
-    sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
-    sf::Vector2f chestCenter = chest.getPosition() + sf::Vector2f(chest.getRadius(), chest.getRadius());
-    sf::Vector2f leftKneeCenter = leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius());
-    sf::Vector2f rightKneeCenter = rightKnee.getPosition() + sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius());
-    sf::Vector2f leftFeetCenter = leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius());
-    sf::Vector2f rightFeetCenter = rightFeet.getPosition() + sf::Vector2f(rightFeet.getRadius(), rightFeet.getRadius());
-
-    lines[0].position = hipCenter; lines[1].position = leftKneeCenter;
-    lines[2].position = hipCenter; lines[3].position = rightKneeCenter;
-    lines[4].position = leftKneeCenter; lines[5].position = leftFeetCenter;
-    lines[6].position = rightKneeCenter; lines[7].position = rightFeetCenter;
-
-    // Draw leg lines
-    window.draw(lines);
-
-    // Define a smoothing factor for control point transitions
-const float smoothingFactor = 0.005f;
-
-// Generate new random target positions for the control points
-float randomX1 = chestCenter.x - 50.0f + static_cast<float>(rand()) / RAND_MAX * 100.0f; // Random x [-50, 50]
-float randomX2 = chestCenter.x - 50.0f + static_cast<float>(rand()) / RAND_MAX * 100.0f; // Random x [-50, 50]
-float randomY = (hipCenter.y + chestCenter.y) / 2.0f; // Fixed y-coordinate (arithmetic mean)
-
-sf::Vector2f targetControlPoint1(randomX1, randomY);
-sf::Vector2f targetControlPoint2(randomX2, randomY);
-
-// Smoothly interpolate control points
-static sf::Vector2f controlPoint1 = targetControlPoint1; // Initialize static control points
-static sf::Vector2f controlPoint2 = targetControlPoint2;
-
-controlPoint1 += smoothingFactor * (targetControlPoint1 - controlPoint1);
-controlPoint2 += smoothingFactor * (targetControlPoint2 - controlPoint2);
-
-// Generate Bezier curve points
-sf::VertexArray bezierCurve(sf::LineStrip, 100); // 100 points for smoothness
-
-for (int i = 0; i < 100; ++i) {
-    float t = i / 99.0f; // Normalize t to [0, 1]
-    float u = 1 - t;
-
-    // Calculate cubic Bezier curve point
-    sf::Vector2f point = 
-        u * u * u * chestCenter + 
-        3 * u * u * t * controlPoint1 + 
-        3 * u * t * t * controlPoint2 + 
-        t * t * t * hipCenter;
-
-    bezierCurve[i].position = point;
-    bezierCurve[i].color = sf::Color::Cyan; // Optional: Set curve color
-}
-
-// Draw the Bezier curve
-window.draw(bezierCurve);
-
-}
-
-
-
-void handleDragging(sf::RenderWindow& window, sf::CircleShape* draggedObject, sf::Vector2f& offset,
-                    const sf::CircleShape& hip, sf::CircleShape& leftKnee, sf::CircleShape& rightKnee,
-                    sf::CircleShape& leftFeet, sf::CircleShape& rightFeet,
-                    float thighLength, float calfLength) {
-    if (draggedObject != nullptr) {
-        sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
-        draggedObject->setPosition(mousePos - offset);
-
-        sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
-
-        if (draggedObject == &leftFeet) {
-            whichFeet = 0;
-            sf::Vector2f feetCenter = leftFeet.getPosition() + sf::Vector2f(leftFeet.getRadius(), leftFeet.getRadius());
-            sf::Vector2f currentKnee = leftKnee.getPosition() + sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius());
-            sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
-            leftKnee.setPosition(newKnee - sf::Vector2f(leftKnee.getRadius(), leftKnee.getRadius()));
-        } else if (draggedObject == &rightFeet) {
-            whichFeet = 1;
-            sf::Vector2f feetCenter = rightFeet.getPosition() + sf::Vector2f(rightFeet.getRadius(), rightFeet.getRadius());
-            sf::Vector2f currentKnee = rightKnee.getPosition() + sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius());
-            sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
-            rightKnee.setPosition(newKnee - sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius()));
+        for (const Cell& neighbor : neighbors) {
+            if (neighbor.isInsideGrid(rows, cols)) {
+                q.push(neighbor);
+            }
         }
     }
-}
-
-void handleKeyboardMovement(float moveStep, float thighLength, float calfLength) {
-    sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
-    sf::CircleShape* activeFeet = (whichFeet == 0) ? &leftFeet : &rightFeet;
-    sf::CircleShape* activeKnee = (whichFeet == 0) ? &leftKnee : &rightKnee;
-
-    sf::Vector2f feetCenter = activeFeet->getPosition() + sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius());
-    feetCenter.x += moveStep;
-
-    sf::Vector2f currentKnee = activeKnee->getPosition() + sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius());
-    sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
-
-    activeFeet->setPosition(feetCenter - sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius()));
-    activeKnee->setPosition(newKnee - sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius()));
-    //whichFeet = 1 - whichFeet; // Alternate feet
+    // Default to top-left if no open cell is found
+    return sf::Vector2f(0, 0);
 }
 
 int main() {
+    sf::RenderWindow window(sf::VideoMode(800, 800), "SFML Procedural Maze Generation");
 
-    // loopCounter++; // to count loops
-    // int loopy = loopCounter%onesteponefoot;
-    // if (loopy!=loopCounter){
-    //     whichFeet = 1-whichFeet;
+    int rows = window.getSize().y / GRID_SPACING;
+    int cols = window.getSize().x / GRID_SPACING;
+
+    std::vector<std::vector<int>> gridColors(rows, std::vector<int>(cols, 0));
+
+    srand(static_cast<unsigned>(time(0)));
+
+    // ------------------------------------ Cellular Automata Maze Generation ------------------------------------
+    // MazeGenerator* generator = new CellularAutomataGenerator(WALL_PROBABILITY, CA_STEPS);
+
+    // ------------------------------------ Drunk Walk Maze Generation ------------------------------------
+    MazeGenerator* generator = new DrunkWalkGenerator(DRUNK_WALK_STEPS);
+
+    // ------------------------------------ Prim's Maze Generation ------------------------------------
+    // MazeGenerator* generator = new PrimGenerator();
+
+    // ------------------------------------ L-System Maze Generation ------------------------------------
+    // MazeGenerator* generator = new LSystemGenerator(L_SYSTEM_ITERATIONS, L_SYSTEM_STARTPOINTS);
+
+
+    generator->generateMaze(gridColors, rows, cols);
+    std::cout << "Maze generated!" << std::endl;
+
+    // make the whole maze a path
+    // for (int row = 1; row < rows - 1; ++row) {
+    //     for (int col = 1; col < cols - 1; ++col) {
+    //         gridColors[row][col] = PATH;
+    //     }
     // }
 
-    sf::RenderWindow window(sf::VideoMode(800, 800), "Simple SFML Window");
-    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-    window.setPosition(sf::Vector2i((desktop.width - window.getSize().x) / 2, (desktop.height - window.getSize().y) / 2));
+    // print the maze
+    // for (int row = 0; row < rows; ++row) {
+    //     for (int col = 0; col < cols; ++col) {
+    //         std::cout << (gridColors[row][col] == WALL ? "#" : " ");
+    //     }
+    //     std::cout << std::endl;
+    // }
 
-    // Define hip position, thigh length, and calf length
-    sf::Vector2f hipPosition = {400, 300};
-    float thighLength = 50.0f; // Length of the thigh
-    float calfLength = 60.0f;  // Length of the calf
+    // ------------------------------------ Player Movement ------------------------------------
+    sf::RectangleShape player(sf::Vector2f(GRID_SPACING, GRID_SPACING));
+    player.setFillColor(sf::Color::Red);
 
-    // Initialize body parts
-    initializeBody(hipPosition, thighLength, calfLength);
+    sf::Vector2f playerPos = findStartingPosition(gridColors, rows, cols);
+    player.setPosition(playerPos);
 
-    sf::CircleShape* draggedObject = nullptr;
-    sf::Vector2f offset;
+    std::cout << "Player starting position: " << playerPos.x << ", " << playerPos.y << std::endl;
+
+    bool isFalling = false;
 
     while (window.isOpen()) {
         sf::Event event;
         while (window.pollEvent(event)) {
             if (event.type == sf::Event::Closed)
                 window.close();
+        }
+        // Linearly interpolate the position between old and new, such that speed is equal to 10000us
+        static sf::Vector2f startPos;
+        static sf::Vector2f endPos;
+        static bool isMoving = false;
+        static sf::Clock moveClock;
+        const sf::Time moveDuration = sf::microseconds(MOVE_DURATION);
 
-            if (controlForm == "Mouse" && event.type == sf::Event::MouseButtonPressed) {
-                sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
-                if (hip.getGlobalBounds().contains(mousePos)) draggedObject = &hip, offset = mousePos - hip.getPosition();
-                else if (leftFeet.getGlobalBounds().contains(mousePos)) draggedObject = &leftFeet, offset = mousePos - leftFeet.getPosition();
-                else if (rightFeet.getGlobalBounds().contains(mousePos)) draggedObject = &rightFeet, offset = mousePos - rightFeet.getPosition();
+        static float fallingSpeed = 0.0f; // Initialize falling speed
+        const float GRAVITY = 0.01f; // Gravity acceleration per frame
+        const float TERM_VELO = 5.0f; // Maximum falling speed
+        
+
+        // ---------------------------------------- Player Movement ----------------------------------------
+        if (!isMoving) {
+            sf::Vector2f playerNewPos = player.getPosition();
+
+            bool keyPressed = false;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) && sf::Keyboard::isKeyPressed(sf::Keyboard::A) && !isFalling) {
+                playerNewPos.y -= GRID_SPACING;
+                playerNewPos.x -= GRID_SPACING;
+                keyPressed = true;
+            } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) && sf::Keyboard::isKeyPressed(sf::Keyboard::D) && !isFalling) {
+                playerNewPos.y -= GRID_SPACING;
+                playerNewPos.x += GRID_SPACING;
+                keyPressed = true;
+            } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) && sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+                playerNewPos.y += GRID_SPACING;
+                playerNewPos.x -= GRID_SPACING;
+                keyPressed = true;
+            } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) && sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+                playerNewPos.y += GRID_SPACING;
+                playerNewPos.x += GRID_SPACING;
+                keyPressed = true;
+            } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) && !isFalling) {
+                playerNewPos.y -= GRID_SPACING;
+                keyPressed = true;
+            } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) {
+                playerNewPos.y += GRID_SPACING;
+                keyPressed = true;
+            } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+                playerNewPos.x -= GRID_SPACING;
+                keyPressed = true;
+            } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+                playerNewPos.x += GRID_SPACING;
+                keyPressed = true;
             }
-            if (controlForm == "Mouse" && event.type == sf::Event::MouseButtonReleased) {
-                draggedObject = nullptr;
+
+            int newRow = static_cast<int>(playerNewPos.y / GRID_SPACING);
+            int newCol = static_cast<int>(playerNewPos.x / GRID_SPACING);
+
+            if (keyPressed && isInBounds(newRow, newCol, rows, cols) && gridColors[newRow][newCol] != WALL) {
+                startPos = player.getPosition();
+                endPos = sf::Vector2f(newCol * GRID_SPACING, newRow * GRID_SPACING);
+                moveClock.restart();
+                isMoving = true;
             }
         }
 
-        loopCounter++;
-        if (loopCounter % onesteponefoot == 0) {
-            whichFeet = 1 - whichFeet; // Alternate feet every `onesteponefoot` loops
+        if (isMoving) {
+            float t = moveClock.getElapsedTime().asMicroseconds() / static_cast<float>(moveDuration.asMicroseconds());
+            if (t >= 1.f) {
+                t = 1.f;
+                isMoving = false;
+            }
+            sf::Vector2f currentPos = startPos + t * (endPos - startPos);
+            player.setPosition(currentPos);
         }
 
-        if (controlForm == "Key") {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) handleKeyboardMovement(-2.f, thighLength, calfLength);
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) handleKeyboardMovement(2.f, thighLength, calfLength);
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::E)){
-                chest.setPosition(sf::Vector2f(chest.getPosition().x+1,chest.getPosition().y-1));
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)){
-                chest.setPosition(sf::Vector2f(chest.getPosition().x+1,chest.getPosition().y+1));
-            }
-             if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)){
-                chest.setPosition(sf::Vector2f(chest.getPosition().x-1,chest.getPosition().y-1));
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)){
-                chest.setPosition(sf::Vector2f(chest.getPosition().x-1,chest.getPosition().y+1));
-            }
-            usleep(15000);
+        std::vector<Limb> limbs;
+        std::vector<sf::Vector2f> hexagonPoints = getHexagonalPoints(player.getPosition());
+
+        // ---------------------------------- Limb and Limb Guidelines Animation ----------------------------------
+        for (const auto& point : hexagonPoints) {
+            sf::Vector2f direction = point - player.getPosition() + sf::Vector2f(GRID_SPACING / 2, GRID_SPACING / 2);
+            sf::Vector2f wallPos = findClosestWall(player.getPosition() + sf::Vector2f(GRID_SPACING / 2, GRID_SPACING / 2), direction, gridColors, rows, cols);
+            limbs.emplace_back(player.getPosition() + sf::Vector2f(GRID_SPACING / 2, GRID_SPACING / 2), wallPos);
         }
 
-        if (controlForm == "Mouse") {
-            handleDragging(window, draggedObject, offset, hip, leftKnee, rightKnee, leftFeet, rightFeet, thighLength, calfLength);
+        sf::VertexArray guideLines(sf::Lines);
+        for (const auto& point : hexagonPoints) {
+            guideLines.append(sf::Vertex(player.getPosition() + sf::Vector2f(player.getSize().x / 2, player.getSize().y / 2), sf::Color(225,135, 0)));
+            guideLines.append(sf::Vertex(point, sf::Color(225, 135, 0))); // Orange color
         }
 
-        // Add randomness to chest position
-       // Define a smoothing factor (0.0 to 1.0, closer to 1.0 for faster transitions)
-const float smoothingFactor = 0.01f;
+        for (Limb& limb : limbs) {
+            limb.animate(1.f); // Animate the limb
+        }
 
-// Calculate the target position with randomness
-float randomX = ((rand() % 42) - 20); // Random x offset in range [-20, 20]
-float randomY = ((rand() % 42) - 20); // Random y offset in range [-20, 20]
-sf::Vector2f targetChestPosition(
-    (leftFeet.getPosition().x + rightFeet.getPosition().x) / 2 + randomX,
-    250 + randomY
-);
+        // ---------------------------------------- Falling ----------------------------------------
+        // Count active limbs
+        int activeLimbs = 0;
+        for (const auto& limb : limbs) {
+            if (limb.active) {
+                activeLimbs++;
+            }
+        }
+        if (activeLimbs == 0) {
+            // No limbs connected: full GRAVITY
+            fallingSpeed += GRAVITY;
+            isFalling = true;
+        } else if (activeLimbs < 3) {
+            // Less than 3 limbs: scaled GRAVITY
+            fallingSpeed += GRAVITY / activeLimbs;
+            isFalling = true;
+        } else {
+            fallingSpeed = 0.0f;
+            isFalling = false;
+        }
+        if (fallingSpeed > TERM_VELO) {
+            fallingSpeed = TERM_VELO;
+        }
+        player.move(0, fallingSpeed);
 
-// Get the current position of the chest
-sf::Vector2f currentChestPosition = chest.getPosition();
-
-// Interpolate towards the target position
-sf::Vector2f smoothChestPosition = currentChestPosition + smoothingFactor * (targetChestPosition - currentChestPosition);
-
-// Update the chest position
-chest.setPosition(smoothChestPosition);
+        // Prevent the player from falling below the grid
+        if (player.getPosition().y > rows * GRID_SPACING) {
+            player.setPosition(player.getPosition().x, rows * GRID_SPACING - GRID_SPACING);
+            fallingSpeed = 0.0f; // Reset falling speed
+            isFalling = false;
+        }
 
 
-        window.clear();
-        drawLines(window, chest, hip, leftKnee, rightKnee, leftFeet, rightFeet);
-        window.draw(hip);
-        window.draw(leftKnee);
-        window.draw(rightKnee);
-        window.draw(leftFeet);
-        window.draw(rightFeet);
+
+        // ---------------------------------------- Drawing ----------------------------------------
+        window.clear(sf::Color::White);
+        sf::VertexArray grid(sf::Lines);
+
+        // Draw gridlines
+        for (int i = 0; i <= rows; ++i) {
+            grid.append(sf::Vertex(sf::Vector2f(0, i * GRID_SPACING), sf::Color::Black));
+            grid.append(sf::Vertex(sf::Vector2f(cols * GRID_SPACING, i * GRID_SPACING), sf::Color::Black));
+        }
+        for (int i = 0; i <= cols; ++i) {
+            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, 0), sf::Color::Black));
+            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, rows * GRID_SPACING), sf::Color::Black));
+        }
 
 
-        window.draw(chest);
+        // Draw colored cells
+        for (int row = 0; row < rows; ++row) {
+            for (int col = 0; col < cols; ++col) {
+                sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
+                cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+                cell.setFillColor(gridColors[row][col] == PATH ? sf::Color::Black : sf::Color::White);
+                window.draw(cell);
+            }
+        }
+
+        window.draw(grid);
+        // window.draw(guideLines);
+        window.draw(player);
+
+        for (const auto& point : hexagonPoints) {
+            sf::CircleShape circle(CIRCLE_RADIUS);
+            circle.setFillColor(sf::Color::Blue);
+            circle.setPosition(point.x - CIRCLE_RADIUS, point.y - CIRCLE_RADIUS);
+            // window.draw(circle);
+        }
+
+        sf::VertexArray limbLines(sf::Lines);
+        for (const auto& limb : limbs) {
+            if(!limb.active) continue;
+            limbLines.append(sf::Vertex(limb.start, sf::Color::Red));
+            limbLines.append(sf::Vertex(limb.end, sf::Color::Red));
+        }
+        window.draw(limbLines);
+
         window.display();
     }
 

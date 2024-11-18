@@ -18,7 +18,8 @@ find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 # Find OpenGL package
 find_package(OpenGL REQUIRED)
 
-add_executable(MyGame src/main.cpp src/mazegen.hpp src/mazegen.cpp)
+add_executable(MyGame src/main.cpp src/mazegen.hpp src/mazegen.cpp src/spider.hpp src/spider.cpp)
+add_executable(stickAnimation src/animation.cpp)
 
 # Include ImGui folder
 # include_directories(${CMAKE_SOURCE_DIR}/imgui)
@@ -37,6 +38,8 @@ include_directories(${SFML_INCLUDE_DIRS})
 
 # Link SFML libraries
 target_link_libraries(MyGame sfml-graphics sfml-window sfml-system)
+target_link_libraries(stickAnimation sfml-graphics sfml-window sfml-system)
 
 # Link OpenGL libraries
 target_link_libraries(MyGame ${OPENGL_LIBRARIES})
+target_link_libraries(stickAnimation ${OPENGL_LIBRARIES})
