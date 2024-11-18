@@ -45,10 +45,10 @@ int main() {
     srand(static_cast<unsigned>(time(0)));
 
     // ------------------------------------ Cellular Automata Maze Generation ------------------------------------
-    // MazeGenerator* generator = new CellularAutomataGenerator(WALL_PROBABILITY, CA_STEPS);
+    MazeGenerator* generator = new CellularAutomataGenerator(WALL_PROBABILITY, CA_STEPS);
 
     // ------------------------------------ Drunk Walk Maze Generation ------------------------------------
-    MazeGenerator* generator = new DrunkWalkGenerator(DRUNK_WALK_STEPS);
+    // MazeGenerator* generator = new DrunkWalkGenerator(DRUNK_WALK_STEPS);
 
     // ------------------------------------ Prim's Maze Generation ------------------------------------
     // MazeGenerator* generator = new PrimGenerator();
