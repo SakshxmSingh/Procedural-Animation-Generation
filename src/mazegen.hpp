@@ -14,7 +14,7 @@
 #define CA_STEPS 5 // Number of Cellular Automata steps
 #define DRUNK_WALK_STEPS 10000 // Number of steps for Drunk Walk generation
 #define L_SYSTEM_ITERATIONS 4 // Number of iterations for L-System generation
-#define L_SYSTEM_STARTPOINTS 5 // Number of starting points for L-System generation
+#define L_SYSTEM_STARTPOINTS 7 // Number of starting points for L-System generation
 #define WALL 0
 #define PATH 1
 
@@ -60,8 +60,8 @@ class LSystemGenerator : public MazeGenerator {
 public:
     LSystemGenerator(int iterations, int startpoints) : iterations(iterations), startpoints(startpoints) {
         rules['F'] = {"F+F-F-F+F", "F-F+F+F-F", "F-F-F+F+F"}; // Multiple rules for randomness
-        rules['+'] = {"+", "-"}; // Turn right or left
-        rules['-'] = {"-", "+"}; // Turn left or right
+        // rules['+'] = {"+", "-"}; // Turn right or left
+        // rules['-'] = {"-", "+"}; // Turn left or right
 
         // Generate the L-system string
         axiom = "F";

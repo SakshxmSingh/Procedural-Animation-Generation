@@ -35,7 +35,7 @@ sf::Vector2f findStartingPosition(const std::vector<std::vector<int>>& gridColor
 }
 
 int main() {
-    sf::RenderWindow window(sf::VideoMode(800, 800), "SFML Procedural Maze Generation");
+    sf::RenderWindow window(sf::VideoMode(800, 800), "Maze spider");
 
     int rows = window.getSize().y / GRID_SPACING;
     int cols = window.getSize().x / GRID_SPACING;

@@ -23,6 +23,17 @@
    cd build
    cmake ..
    make
-   ./MyGame
+   ./mazeSpider // or
+   ./stickAnimation
    ```
 5. Enjoy the game!
+
+## How to play the game
+### For Maze Spider
+- use the WASD keys to move the spider
+- explore and enjoy the animation
+
+### For Stick Animation
+- use the arrow keys to move the stickman
+- use WASD keys to move the head bobbing
+- enjoy the animation
