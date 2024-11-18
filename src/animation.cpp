@@ -258,8 +258,8 @@ int main() {
     // }
 
     sf::RenderWindow window(sf::VideoMode(800, 800), "Simple SFML Window");
-    sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-    window.setPosition(sf::Vector2i((desktop.width - window.getSize().x) / 2, (desktop.height - window.getSize().y) / 2));
+    // sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
+    // window.setPosition(sf::Vector2i((desktop.width - window.getSize().x) / 2, (desktop.height - window.getSize().y) / 2));
 
     // Define hip position, thigh length, and calf length
     sf::Vector2f hipPosition = {400, 650};
