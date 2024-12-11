@@ -21,6 +21,10 @@ find_package(OpenGL REQUIRED)
 add_executable(mazeSpider src/main.cpp src/mazegen.hpp src/mazegen.cpp src/spider.hpp src/spider.cpp)
 add_executable(stickAnimation src/animation.cpp)
 
+
+file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
+
+
 # Include ImGui folder
 # include_directories(${CMAKE_SOURCE_DIR}/imgui)
 include_directories(${SFML_INCLUDE_DIRS})

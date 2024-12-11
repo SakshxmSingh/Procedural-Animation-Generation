@@ -17,6 +17,7 @@
 #define L_SYSTEM_STARTPOINTS 7 // Number of starting points for L-System generation
 #define WALL 0
 #define PATH 1
+#define LIGHT 2
 
 struct Cell {
     int row, col;

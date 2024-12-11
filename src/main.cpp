@@ -60,6 +60,39 @@ int main() {
     generator->generateMaze(gridColors, rows, cols);
     std::cout << "Maze generated!" << std::endl;
 
+    // with 10% chance, make a wall a light
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col) {
+            if (gridColors[row][col] == WALL && rand() % 60 == 0) {
+                gridColors[row][col] = LIGHT;
+            }
+        }
+    }
+
+    sf::Texture wallTexture;
+    if(!wallTexture.loadFromFile("assets/grey-wall.png")) {
+        std::cerr << "Failed to load wall texture!" << std::endl;
+        return 1;
+    }
+
+    sf::Texture surfaceTexture;
+    if(!surfaceTexture.loadFromFile("assets/grey-surface.png")) {
+        std::cerr << "Failed to load surface texture!" << std::endl;
+        return 1;
+    }
+
+    sf::Texture backgroundTexture;
+    if(!backgroundTexture.loadFromFile("assets/background.png")) {
+        std::cerr << "Failed to load background texture!" << std::endl;
+        return 1;
+    }
+
+    sf::Texture lightTexture;
+    if(!lightTexture.loadFromFile("assets/light.png")) {
+        std::cerr << "Failed to load light texture!" << std::endl;
+        return 1;
+    }
+
     // make the whole maze a path
     // for (int row = 1; row < rows - 1; ++row) {
     //     for (int col = 1; col < cols - 1; ++col) {
@@ -142,7 +175,7 @@ int main() {
             int newRow = static_cast<int>(playerNewPos.y / GRID_SPACING);
             int newCol = static_cast<int>(playerNewPos.x / GRID_SPACING);
 
-            if (keyPressed && isInBounds(newRow, newCol, rows, cols) && gridColors[newRow][newCol] != WALL) {
+            if (keyPressed && isInBounds(newRow, newCol, rows, cols) && gridColors[newRow][newCol] != WALL && gridColors[newRow][newCol] != LIGHT) {
                 startPos = player.getPosition();
                 endPos = sf::Vector2f(newCol * GRID_SPACING, newRow * GRID_SPACING);
                 moveClock.restart();
@@ -230,16 +263,59 @@ int main() {
 
 
         // Draw colored cells
+        // for (int row = 0; row < rows; ++row) {
+        //     for (int col = 0; col < cols; ++col) {
+        //         sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
+        //         cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+        //         cell.setFillColor(gridColors[row][col] == PATH ? sf::Color::Black : sf::Color::White);
+        //         window.draw(cell);
+        //     }
+        // }
+
+        // window.draw(grid);
+
         for (int row = 0; row < rows; ++row) {
             for (int col = 0; col < cols; ++col) {
-                sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
-                cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-                cell.setFillColor(gridColors[row][col] == PATH ? sf::Color::Black : sf::Color::White);
-                window.draw(cell);
+                if (gridColors[row][col] == WALL) {
+                    sf::Sprite cellSprite;
+                    if (row > 0 && (gridColors[row - 1][col] == WALL || gridColors[row - 1][col] == LIGHT)) {
+                        cellSprite.setTexture(wallTexture);
+                    } else {
+                        cellSprite.setTexture(surfaceTexture);
+                    }
+                    cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+                    cellSprite.setScale(
+                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
+                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
+                    );
+                    window.draw(cellSprite);
+                } else if (gridColors[row][col] == PATH) {
+                    // sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
+                    // cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+                    // cell.setFillColor(sf::Color::Black);
+                    // window.draw(cell);
+                    sf::Sprite cellSprite;
+                    cellSprite.setTexture(backgroundTexture);
+                    cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+                    cellSprite.setScale(
+                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
+                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
+                    );
+                    window.draw(cellSprite);
+                } else if (gridColors[row][col] == LIGHT) {
+                    sf::Sprite cellSprite;
+                    cellSprite.setTexture(lightTexture);
+                    cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+                    cellSprite.setScale(
+                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
+                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
+                    );
+                    window.draw(cellSprite);
+                }
             }
         }
 
-        window.draw(grid);
+
         // window.draw(guideLines);
         window.draw(player);
 
