@@ -93,6 +93,48 @@ int main() {
         return 1;
     }
 
+    wallTexture.setSmooth(true);
+    surfaceTexture.setSmooth(true);
+    backgroundTexture.setSmooth(true);
+    lightTexture.setSmooth(true);
+
+    sf::Sprite wallSprite;
+    wallSprite.setTexture(wallTexture);
+    wallSprite.setScale(
+        GRID_SPACING / static_cast<float>(wallSprite.getTexture()->getSize().x),
+        GRID_SPACING / static_cast<float>(wallSprite.getTexture()->getSize().y)
+    );
+
+    sf::Sprite surfaceSprite;
+    surfaceSprite.setTexture(surfaceTexture);
+    surfaceSprite.setScale(
+        GRID_SPACING / static_cast<float>(surfaceSprite.getTexture()->getSize().x),
+        GRID_SPACING / static_cast<float>(surfaceSprite.getTexture()->getSize().y)
+    );
+
+    sf::Sprite backgroundSprite;
+    backgroundSprite.setTexture(backgroundTexture);
+    backgroundSprite.setScale(
+        GRID_SPACING / static_cast<float>(backgroundSprite.getTexture()->getSize().x),
+        GRID_SPACING / static_cast<float>(backgroundSprite.getTexture()->getSize().y)
+    );
+
+    sf::Sprite lightSprite;
+    lightSprite.setTexture(lightTexture);
+    lightSprite.setScale(
+        GRID_SPACING / static_cast<float>(lightSprite.getTexture()->getSize().x),
+        GRID_SPACING / static_cast<float>(lightSprite.getTexture()->getSize().y)
+    );
+
+    std::vector<sf::Vector2f> lightSources;
+    for (int row = 0; row < rows; ++row) {
+        for (int col = 0; col < cols; ++col) {
+            if (gridColors[row][col] == LIGHT) {
+                lightSources.emplace_back(col, row);
+            }
+        }
+    }
+
     // make the whole maze a path
     // for (int row = 1; row < rows - 1; ++row) {
     //     for (int col = 1; col < cols - 1; ++col) {
@@ -135,6 +177,7 @@ int main() {
         static float fallingSpeed = 0.0f; // Initialize falling speed
         const float GRAVITY = 0.01f; // Gravity acceleration per frame
         const float TERM_VELO = 5.0f; // Maximum falling speed
+        const float LIGHT_RADIUS = 8.0f; // Radius of light effect
         
 
         // ---------------------------------------- Player Movement ----------------------------------------
@@ -245,73 +288,103 @@ int main() {
             isFalling = false;
         }
 
-
+        int playerPosition_x = static_cast<int>(player.getPosition().x / GRID_SPACING);
+        int playerPosition_y = static_cast<int>(player.getPosition().y / GRID_SPACING);
 
         // ---------------------------------------- Drawing ----------------------------------------
         window.clear(sf::Color::White);
-        sf::VertexArray grid(sf::Lines);
 
-        // Draw gridlines
-        for (int i = 0; i <= rows; ++i) {
-            grid.append(sf::Vertex(sf::Vector2f(0, i * GRID_SPACING), sf::Color::Black));
-            grid.append(sf::Vertex(sf::Vector2f(cols * GRID_SPACING, i * GRID_SPACING), sf::Color::Black));
-        }
-        for (int i = 0; i <= cols; ++i) {
-            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, 0), sf::Color::Black));
-            grid.append(sf::Vertex(sf::Vector2f(i * GRID_SPACING, rows * GRID_SPACING), sf::Color::Black));
-        }
-
-
-        // Draw colored cells
-        // for (int row = 0; row < rows; ++row) {
+        // for (int row = 0; row < rows; ++row) {                                   // Old drawing method, without light effect
         //     for (int col = 0; col < cols; ++col) {
-        //         sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
-        //         cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-        //         cell.setFillColor(gridColors[row][col] == PATH ? sf::Color::Black : sf::Color::White);
-        //         window.draw(cell);
+        //         if (gridColors[row][col] == WALL) {
+        //             sf::Sprite cellSprite;
+        //             if (row > 0 && (gridColors[row - 1][col] == WALL || gridColors[row - 1][col] == LIGHT)) {
+        //                 cellSprite.setTexture(wallTexture);
+        //             } else {
+        //                 cellSprite.setTexture(surfaceTexture);
+        //             }
+        //             cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+        //             cellSprite.setScale(
+        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
+        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
+        //             );
+        //             window.draw(cellSprite);
+        //         } else if (gridColors[row][col] == PATH) {
+        //             // sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
+        //             // cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+        //             // cell.setFillColor(sf::Color::Black);
+        //             // window.draw(cell);
+        //             sf::Sprite cellSprite;
+        //             cellSprite.setTexture(backgroundTexture);
+        //             cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+        //             cellSprite.setScale(
+        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
+        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
+        //             );
+        //             window.draw(cellSprite);
+        //         } else if (gridColors[row][col] == LIGHT) {
+        //             sf::Sprite cellSprite;
+        //             cellSprite.setTexture(lightTexture);
+        //             cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+        //             cellSprite.setScale(
+        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
+        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
+        //             );
+        //             window.draw(cellSprite);
+        //         }
         //     }
         // }
 
-        // window.draw(grid);
-
         for (int row = 0; row < rows; ++row) {
             for (int col = 0; col < cols; ++col) {
+                sf::Sprite cellSprite;
+
                 if (gridColors[row][col] == WALL) {
-                    sf::Sprite cellSprite;
-                    if (row > 0 && (gridColors[row - 1][col] == WALL || gridColors[row - 1][col] == LIGHT)) {
-                        cellSprite.setTexture(wallTexture);
-                    } else {
-                        cellSprite.setTexture(surfaceTexture);
-                    }
-                    cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-                    cellSprite.setScale(
-                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
-                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
-                    );
-                    window.draw(cellSprite);
+                    cellSprite = (row > 0 && (gridColors[row - 1][col] == WALL || gridColors[row - 1][col] == LIGHT))
+                                    ? wallSprite
+                                    : surfaceSprite;
                 } else if (gridColors[row][col] == PATH) {
-                    // sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
-                    // cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-                    // cell.setFillColor(sf::Color::Black);
-                    // window.draw(cell);
-                    sf::Sprite cellSprite;
-                    cellSprite.setTexture(backgroundTexture);
-                    cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-                    cellSprite.setScale(
-                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
-                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
-                    );
-                    window.draw(cellSprite);
+                    cellSprite = backgroundSprite;
                 } else if (gridColors[row][col] == LIGHT) {
-                    sf::Sprite cellSprite;
-                    cellSprite.setTexture(lightTexture);
-                    cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-                    cellSprite.setScale(
-                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
-                        GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
-                    );
-                    window.draw(cellSprite);
+                    cellSprite = lightSprite;
                 }
+
+                // Calculate attenuation based on light sources
+                float lightbrightness = 0.05f; 
+
+                for (const auto& lightPos : lightSources) { // `lightSources` contains all light positions
+                    float localbrightness = 0.05f;
+                    float dx = col - lightPos.x;
+                    float dy = row - lightPos.y;
+                    float distance = std::sqrt(dx * dx + dy * dy);
+
+                    if (distance <= LIGHT_RADIUS) {
+                        localbrightness += 1.0f / (1.4f + (distance / LIGHT_RADIUS) * (distance / LIGHT_RADIUS));   // Attenuation formula, contribution of one light source
+                    }
+                    lightbrightness = std::max(lightbrightness, localbrightness);   // Use the maximum brightness
+                }
+
+                float playerbrightness = 0.05f;
+
+                // Include the player's light effect
+                float playerDx = col - playerPosition_x; 
+                float playerDy = row - playerPosition_y;
+                float playerDistance = std::sqrt(playerDx * playerDx + playerDy * playerDy);
+
+                if (playerDistance <= LIGHT_RADIUS) {
+                    playerbrightness += 1.0f / (1.4f + (playerDistance / LIGHT_RADIUS) * (playerDistance / LIGHT_RADIUS));
+                }
+
+                float brightness = std::max(lightbrightness, playerbrightness); // Use the maximum brightness
+                brightness = std::min(brightness, 1.0f); // Cap brightness to a maximum of 1.0
+
+                // Adjust the sprite's color based on the brightness
+                sf::Color color = sf::Color(255 * brightness, 255 * brightness, 255 * brightness);
+                cellSprite.setColor(color);
+
+                // Set position and draw the sprite
+                cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
+                window.draw(cellSprite);
             }
         }
 
