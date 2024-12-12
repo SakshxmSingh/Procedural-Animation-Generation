@@ -25,20 +25,7 @@ add_executable(stickAnimation src/animation.cpp)
 file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
 
 
-# Include ImGui folder
-# include_directories(${CMAKE_SOURCE_DIR}/imgui)
 include_directories(${SFML_INCLUDE_DIRS})
-
-# # Add ImGui library
-# add_library(imgui STATIC
-#     imgui/imgui.cpp
-#     imgui/imgui_draw.cpp
-#     imgui/imgui_widgets.cpp
-#     imgui/imgui-SFML.cpp
-# )
-
-# Link ImGui library
-# target_link_libraries(MyGame imgui)
 
 # Link SFML libraries
 target_link_libraries(mazeSpider sfml-graphics sfml-window sfml-system)
