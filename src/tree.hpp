@@ -8,7 +8,6 @@
 
 #include <SFML/Graphics.hpp>
 
-// Function declaration for drawing the tree
 void drawIKTree(sf::RenderWindow &window, sf::Vector2f start, float length, float angle, int depth, int branchingFactor, float swayOffset, float time);
 
 #endif // TREE_H

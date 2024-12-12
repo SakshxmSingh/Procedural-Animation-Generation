@@ -5,7 +5,7 @@ std::vector<sf::Vector2f> getHexagonalPoints(const sf::Vector2f& playerPosition)
     float angles[] = {0, 60, 120, 180, 240, 300}; // hexagon angles
 
     for (float angle : angles) {
-        float radians = angle * (M_PI / 180.0f); // Convert degrees to radians
+        float radians = angle * (M_PI / 180.0f); 
         float offsetX = HEXAGON_DISTANCE * cos(radians);
         float offsetY = HEXAGON_DISTANCE * sin(radians);
 
@@ -34,7 +34,6 @@ sf::Vector2f findClosestWall(const sf::Vector2f& start, const sf::Vector2f& dire
             return sf::Vector2f(col * GRID_SPACING + GRID_SPACING / 2, row * GRID_SPACING + GRID_SPACING / 2); // Center of wall cell
         }
 
-        // Move to the next position along the direction
         current += step;
     }
 

@@ -36,5 +36,4 @@ struct Limb {
 
 std::vector<sf::Vector2f> getHexagonalPoints(const sf::Vector2f& playerPosition);
 sf::Vector2f findClosestWall(const sf::Vector2f& start, const sf::Vector2f& direction, const std::vector<std::vector<int>>& gridColors, int rows, int cols);
-// Function to find the first open cell (PATH) from the bottom-left of the grid
 sf::Vector2f findStartingPosition(const std::vector<std::vector<int>>& gridColors, int rows, int cols);

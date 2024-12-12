@@ -60,7 +60,7 @@ int main() {
     generator->generateMaze(gridColors, rows, cols);
     std::cout << "Maze generated!" << std::endl;
 
-    // with 10% chance, make a wall a light
+    // with 1.25% chance, make a wall a light
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < cols; ++col) {
             if (gridColors[row][col] == WALL && rand() % 80 == 0) {
@@ -135,32 +135,21 @@ int main() {
         }
     }
 
-    // make the whole maze a path
+    // -------------------------------make the whole maze a path---------------------------------------
     // for (int row = 1; row < rows - 1; ++row) {
     //     for (int col = 1; col < cols - 1; ++col) {
     //         gridColors[row][col] = PATH;
     //     }
     // }
 
-    // print the maze
-    // for (int row = 0; row < rows; ++row) {
-    //     for (int col = 0; col < cols; ++col) {
-    //         std::cout << (gridColors[row][col] == WALL ? "#" : " ");
-    //     }
-    //     std::cout << std::endl;
-    // }
 
     //------------------------------------Tree----------------------------------------------------------
 
-    std::vector<sf::Vector2f> treeGridArray; // Define treeGridArray as a vector of Vector2f
+    std::vector<sf::Vector2f> treeGridArray; 
 
-    for (int row = 2; row < rows; ++row) { // Start from row 2 to avoid out-of-bounds
-        for (int col = 1; col < cols - 1; ++col) { // Start from col 1 and stop at cols-1
-
-            // Check if the current cell is a WALL
+    for (int row = 2; row < rows; ++row) { 
+        for (int col = 1; col < cols - 1; ++col) { 
             if (gridColors[row][col] == WALL) {
-
-                // Check the required PATH conditions
                 bool validPosition = 
                     gridColors[row - 1][col] == PATH &&
                     gridColors[row - 1][col - 1] == PATH &&
@@ -170,9 +159,7 @@ int main() {
                     gridColors[row - 2][col + 1] == PATH;
 
                 if (validPosition) {
-                    // Add the valid tree position to the treeGridArray
                     if (validPosition && (rand() % 5 == 0)) { // Randomly decide whether to add the tree
-                        // Add the valid tree position to the treeGridArray
                         treeGridArray.push_back(sf::Vector2f(col * GRID_SPACING + GRID_SPACING / 2, row * GRID_SPACING));
 
                         lightSources.emplace_back(col - 1, row);
@@ -348,47 +335,6 @@ int main() {
         // ---------------------------------------- Drawing ----------------------------------------
         window.clear(sf::Color::White);
 
-        // for (int row = 0; row < rows; ++row) {                                   // Old drawing method, without light effect
-        //     for (int col = 0; col < cols; ++col) {
-        //         if (gridColors[row][col] == WALL) {
-        //             sf::Sprite cellSprite;
-        //             if (row > 0 && (gridColors[row - 1][col] == WALL || gridColors[row - 1][col] == LIGHT)) {
-        //                 cellSprite.setTexture(wallTexture);
-        //             } else {
-        //                 cellSprite.setTexture(surfaceTexture);
-        //             }
-        //             cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-        //             cellSprite.setScale(
-        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
-        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
-        //             );
-        //             window.draw(cellSprite);
-        //         } else if (gridColors[row][col] == PATH) {
-        //             // sf::RectangleShape cell(sf::Vector2f(GRID_SPACING, GRID_SPACING));
-        //             // cell.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-        //             // cell.setFillColor(sf::Color::Black);
-        //             // window.draw(cell);
-        //             sf::Sprite cellSprite;
-        //             cellSprite.setTexture(backgroundTexture);
-        //             cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-        //             cellSprite.setScale(
-        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
-        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
-        //             );
-        //             window.draw(cellSprite);
-        //         } else if (gridColors[row][col] == LIGHT) {
-        //             sf::Sprite cellSprite;
-        //             cellSprite.setTexture(lightTexture);
-        //             cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
-        //             cellSprite.setScale(
-        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().x),
-        //                 GRID_SPACING / static_cast<float>(cellSprite.getTexture()->getSize().y)
-        //             );
-        //             window.draw(cellSprite);
-        //         }
-        //     }
-        // }
-
         for (int row = 0; row < rows; ++row) {
             for (int col = 0; col < cols; ++col) {
                 sf::Sprite cellSprite;
@@ -436,7 +382,6 @@ int main() {
                 sf::Color color = sf::Color(255 * brightness, 255 * brightness, 255 * brightness);
                 cellSprite.setColor(color);
 
-                // Set position and draw the sprite
                 cellSprite.setPosition(col * GRID_SPACING, row * GRID_SPACING);
                 window.draw(cellSprite);
             }
@@ -477,7 +422,6 @@ int main() {
             float time = clock.getElapsedTime().asSeconds();
             float swayOffset = swayAmplitude * sin(time * swaySpeed + i * 0.1f);
 
-            // Draw the tree with inverse kinematics animation
             drawIKTree(window, treeGridArray[i], lengthVariation, 90, depthVariation, branchingVariation, swayOffset, time);
         }
 
