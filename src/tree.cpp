@@ -27,8 +27,8 @@ void drawIKTree(sf::RenderWindow &window, sf::Vector2f start, float length, floa
 
     // Draw the line for the current branch
     sf::Vertex line[] = {
-        sf::Vertex(start, sf::Color{ 89 , 86, 130 }),
-        sf::Vertex(end, sf::Color{ 89 , 86, 130 })
+        sf::Vertex(start, sf::Color{ 100 , 95, 145 }),
+        sf::Vertex(end, sf::Color{ 100 , 95, 145 })
     };
     window.draw(line, 2, sf::Lines);
 
