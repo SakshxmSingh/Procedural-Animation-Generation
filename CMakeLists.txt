@@ -18,7 +18,7 @@ find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 # Find OpenGL package
 find_package(OpenGL REQUIRED)
 
-add_executable(mazeSpider src/main.cpp src/mazegen.hpp src/mazegen.cpp src/spider.hpp src/spider.cpp)
+add_executable(mazeSpider src/main.cpp src/mazegen.hpp src/mazegen.cpp src/spider.hpp src/spider.cpp src/tree.hpp src/tree.cpp)
 add_executable(stickAnimation src/animation.cpp)
 
 

@@ -200,6 +200,23 @@ void drawLines(sf::RenderWindow& window, const sf::CircleShape& orb, const sf::C
 }
 
 
+void handleKeyboardMovement(float moveStep, float thighLength, float calfLength) {
+    sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
+    sf::CircleShape* activeFeet = (whichFeet == 0) ? &leftFeet : &rightFeet;
+    sf::CircleShape* activeKnee = (whichFeet == 0) ? &leftKnee : &rightKnee;
+
+    sf::Vector2f feetCenter = activeFeet->getPosition() + sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius());
+    sf::Vector2f currentKnee = activeKnee->getPosition() + sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius());
+    
+    feetCenter.x += moveStep;
+
+    
+    sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
+
+    activeFeet->setPosition(feetCenter - sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius()));
+    activeKnee->setPosition(newKnee - sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius()));
+    //whichFeet = 1 - whichFeet; // Alternate feet
+}
 
 void handleDragging(sf::RenderWindow& window, sf::CircleShape* draggedObject, sf::Vector2f& offset,
                     const sf::CircleShape& hip, sf::CircleShape& leftKnee, sf::CircleShape& rightKnee,
@@ -225,169 +242,4 @@ void handleDragging(sf::RenderWindow& window, sf::CircleShape* draggedObject, sf
             rightKnee.setPosition(newKnee - sf::Vector2f(rightKnee.getRadius(), rightKnee.getRadius()));
         }
     }
-}
-
-void handleKeyboardMovement(float moveStep, float thighLength, float calfLength) {
-    sf::Vector2f hipCenter = hip.getPosition() + sf::Vector2f(hip.getRadius(), hip.getRadius());
-    sf::CircleShape* activeFeet = (whichFeet == 0) ? &leftFeet : &rightFeet;
-    sf::CircleShape* activeKnee = (whichFeet == 0) ? &leftKnee : &rightKnee;
-
-    sf::Vector2f feetCenter = activeFeet->getPosition() + sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius());
-    sf::Vector2f currentKnee = activeKnee->getPosition() + sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius());
-    
-    feetCenter.x += moveStep;
-
-    
-    sf::Vector2f newKnee = findKneePosition(hipCenter, feetCenter, thighLength, calfLength, currentKnee);
-
-    activeFeet->setPosition(feetCenter - sf::Vector2f(activeFeet->getRadius(), activeFeet->getRadius()));
-    activeKnee->setPosition(newKnee - sf::Vector2f(activeKnee->getRadius(), activeKnee->getRadius()));
-    //whichFeet = 1 - whichFeet; // Alternate feet
-}
-
-
-int main() {
-
-    // loopCounter++; // to count loops
-    // int loopy = loopCounter%onesteponefoot;
-    // if (loopy!=loopCounter){
-    //     whichFeet = 1-whichFeet;
-    // }
-
-    sf::RenderWindow window(sf::VideoMode(800, 800), "Simple Stickman");
-    // sf::VideoMode desktop = sf::VideoMode::getDesktopMode();
-    // window.setPosition(sf::Vector2i((desktop.width - window.getSize().x) / 2, (desktop.height - window.getSize().y) / 2));
-
-    // Define hip position, thigh length, and calf length
-    sf::Vector2f hipPosition = {400, 650};
-    float thighLength = 50.0f; // Length of the thigh
-    float calfLength = 60.0f;  // Length of the calf
-
-    // Initialize body parts
-    initializeBody(hipPosition, thighLength, calfLength);
-
-    sf::CircleShape* draggedObject = nullptr;
-    sf::Vector2f offset;
-
-    while (window.isOpen()) {
-        sf::Event event;
-        while (window.pollEvent(event)) {
-            if (event.type == sf::Event::Closed)
-                window.close();
-
-            if (controlForm == "Mouse" && event.type == sf::Event::MouseButtonPressed) {
-                sf::Vector2f mousePos = window.mapPixelToCoords(sf::Mouse::getPosition(window));
-                if (hip.getGlobalBounds().contains(mousePos)) draggedObject = &hip, offset = mousePos - hip.getPosition();
-                else if (leftFeet.getGlobalBounds().contains(mousePos)) draggedObject = &leftFeet, offset = mousePos - leftFeet.getPosition();
-                else if (rightFeet.getGlobalBounds().contains(mousePos)) draggedObject = &rightFeet, offset = mousePos - rightFeet.getPosition();
-            }
-            if (controlForm == "Mouse" && event.type == sf::Event::MouseButtonReleased) {
-                draggedObject = nullptr;
-            }
-        }
-
-        // loopCounter++;
-        // if (loopCounter % onesteponefoot == 0) {
-        //     whichFeet = 1 - whichFeet; // Alternate feet every `onesteponefoot` loops
-        // }
-        
-        int rangelow = 50;
-        int rangehigh = 75;
-
-        if(moving == 0){
-            // std::cout << "left";
-            if(rightFeet.getPosition().x >= leftFeet.getPosition().x - rangehigh && 
-                rightFeet.getPosition().x <= leftFeet.getPosition().x - rangelow){
-                // this means right is lefter
-                whichFeet = 0;
-            }
-            if(leftFeet.getPosition().x >= rightFeet.getPosition().x - rangehigh && 
-                leftFeet.getPosition().x <= rightFeet.getPosition().x - rangelow){
-                //std::cout << "maki 000000";
-                whichFeet = 1;
-            }
-        }
-        if(moving == 1){
-            // std::cout << "right";
-            if(rightFeet.getPosition().x >= leftFeet.getPosition().x - rangehigh && 
-                rightFeet.getPosition().x <= leftFeet.getPosition().x - rangelow){
-                // this means right is lefter
-                whichFeet = 1;
-            }
-            if(leftFeet.getPosition().x >= rightFeet.getPosition().x - rangehigh && 
-                leftFeet.getPosition().x <= rightFeet.getPosition().x - rangelow){
-                //std::cout << "maki 000000";
-                whichFeet = 0;
-            }
-        }
-
-        
-
-        if (controlForm == "Key") {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left)) {
-                handleKeyboardMovement(-2.f, thighLength, calfLength);
-                moving = 0;
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) {
-                handleKeyboardMovement(2.f, thighLength, calfLength);
-                moving = 1;
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::E)){
-                orb.setPosition(sf::Vector2f(orb.getPosition().x+1,orb.getPosition().y-1));
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)){
-                orb.setPosition(sf::Vector2f(orb.getPosition().x+1,orb.getPosition().y+1));
-            }
-             if (sf::Keyboard::isKeyPressed(sf::Keyboard::W)){
-                orb.setPosition(sf::Vector2f(orb.getPosition().x-1,orb.getPosition().y-1));
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)){
-                orb.setPosition(sf::Vector2f(orb.getPosition().x-1,orb.getPosition().y+1));
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)){
-                istentacle = !istentacle;
-            }
-            usleep(15000);
-        }
-
-        if (controlForm == "Mouse") {
-            handleDragging(window, draggedObject, offset, hip, leftKnee, rightKnee, leftFeet, rightFeet, thighLength, calfLength);
-        }
-
-        // Add randomness to orb position
-       // Define a smoothing factor (0.0 to 1.0, closer to 1.0 for faster transitions)
-        const float smoothingFactor = 0.01f;
-
-        // Calculate the target position with randomness
-        float randomX = ((rand() % 42) - 20); // Random x offset in range [-20, 20]
-        float randomY = ((rand() % 42) - 20); // Random y offset in range [-20, 20]
-        sf::Vector2f targetorbPosition(
-            (leftFeet.getPosition().x + rightFeet.getPosition().x) / 2 + randomX,
-            600 + randomY
-        );
-
-        // Get the current position of the orb
-        sf::Vector2f currentorbPosition = orb.getPosition();
-
-        // Interpolate towards the target position
-        sf::Vector2f smoothorbPosition = currentorbPosition + smoothingFactor * (targetorbPosition - currentorbPosition);
-
-        // Update the orb position
-        orb.setPosition(smoothorbPosition);
-
-
-        window.clear();
-        drawLines(window, orb, hip, leftKnee, rightKnee, leftFeet, rightFeet);
-        window.draw(hip);
-        window.draw(leftKnee);
-        window.draw(rightKnee);
-        window.draw(leftFeet);
-        window.draw(rightFeet);
-
-
-        window.draw(orb);
-        window.display();
-    }
-
-    return 0;
 }

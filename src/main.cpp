@@ -1,8 +1,8 @@
 #include "mazegen.hpp"
 #include "spider.hpp"
+#include "tree.hpp"
 
 #define MOVE_DURATION 60000 // Duration of player movement in microseconds
-
 
 // Function to find the first open cell (PATH) from the bottom-left of the grid
 sf::Vector2f findStartingPosition(const std::vector<std::vector<int>>& gridColors, int rows, int cols) {  //BFS
@@ -63,7 +63,7 @@ int main() {
     // with 10% chance, make a wall a light
     for (int row = 0; row < rows; ++row) {
         for (int col = 0; col < cols; ++col) {
-            if (gridColors[row][col] == WALL && rand() % 60 == 0) {
+            if (gridColors[row][col] == WALL && rand() % 80 == 0) {
                 gridColors[row][col] = LIGHT;
             }
         }
@@ -88,7 +88,7 @@ int main() {
     }
 
     sf::Texture lightTexture;
-    if(!lightTexture.loadFromFile("assets/light.png")) {
+    if(!lightTexture.loadFromFile("assets/light2.png")) {
         std::cerr << "Failed to load light texture!" << std::endl;
         return 1;
     }
@@ -150,6 +150,58 @@ int main() {
     //     std::cout << std::endl;
     // }
 
+    //------------------------------------Tree----------------------------------------------------------
+
+    std::vector<sf::Vector2f> treeGridArray; // Define treeGridArray as a vector of Vector2f
+
+    for (int row = 2; row < rows; ++row) { // Start from row 2 to avoid out-of-bounds
+        for (int col = 1; col < cols - 1; ++col) { // Start from col 1 and stop at cols-1
+
+            // Check if the current cell is a WALL
+            if (gridColors[row][col] == WALL) {
+
+                // Check the required PATH conditions
+                bool validPosition = 
+                    gridColors[row - 1][col] == PATH &&
+                    gridColors[row - 1][col - 1] == PATH &&
+                    gridColors[row - 1][col + 1] == PATH &&
+                    gridColors[row - 2][col] == PATH &&
+                    gridColors[row - 2][col - 1] == PATH &&
+                    gridColors[row - 2][col + 1] == PATH;
+
+                if (validPosition) {
+                    // Add the valid tree position to the treeGridArray
+                    if (validPosition && (rand() % 5 == 0)) { // Randomly decide whether to add the tree
+                        // Add the valid tree position to the treeGridArray
+                        treeGridArray.push_back(sf::Vector2f(col * GRID_SPACING + GRID_SPACING / 2, row * GRID_SPACING));
+
+                        lightSources.emplace_back(col - 1, row);
+                        lightSources.emplace_back(col + 1, row);
+                        lightSources.emplace_back(col, row - 1);
+                        lightSources.emplace_back(col - 1, row - 1);
+                        lightSources.emplace_back(col + 1, row - 1);
+
+                    }
+                }
+            }
+        }
+    }
+
+    sf::Vector2f rootPosition;
+    // Root position for the tree
+    if(treeGridArray.size() > 0) {
+        sf::Vector2f rootPosition(treeGridArray[0]);
+        printf("Root position: %f, %f\n", rootPosition.x, rootPosition.y);
+
+    }
+    // sf::Vector2f rootPosition(treeGridArray[0]);
+
+    // Parameters for the tree
+    float swayAmplitude = 10.0f; // Amplitude of sway in degrees
+    float swaySpeed = 1.5f; // Speed of sway
+    sf::Clock clock;
+
+
     // ------------------------------------ Player Movement ------------------------------------
     sf::RectangleShape player(sf::Vector2f(GRID_SPACING, GRID_SPACING));
     player.setFillColor(sf::Color::Red);
@@ -171,7 +223,9 @@ int main() {
         static sf::Vector2f startPos;
         static sf::Vector2f endPos;
         static bool isMoving = false;
-        static sf::Clock moveClock;
+        static sf::Clock moveClock, droneWalkTimer;
+        static float droneWalkInterval = 2.0f;
+        static int droneMoving = 0;
         const sf::Time moveDuration = sf::microseconds(MOVE_DURATION);
 
         static float fallingSpeed = 0.0f; // Initialize falling speed
@@ -388,7 +442,6 @@ int main() {
             }
         }
 
-
         // window.draw(guideLines);
         window.draw(player);
 
@@ -406,6 +459,27 @@ int main() {
             limbLines.append(sf::Vertex(limb.end, sf::Color::Red));
         }
         window.draw(limbLines);
+        
+
+        // -------------------------------------------Tree-------------------------------------------------------
+
+        float initialLength = 17.0f;
+        int maxDepth = 4; // Number of levels in the tree
+        int branchingFactor = 2; // Number of branches at each node
+
+        for (size_t i = 0; i < treeGridArray.size(); ++i) {
+            // Vary parameters slightly for each tree
+            float lengthVariation = initialLength + (i % 3) * 2.0f;
+            int depthVariation = maxDepth + (i % 2);
+            int branchingVariation = 2 + i%2;
+
+            // Calculate sway offset based on time
+            float time = clock.getElapsedTime().asSeconds();
+            float swayOffset = swayAmplitude * sin(time * swaySpeed + i * 0.1f);
+
+            // Draw the tree with inverse kinematics animation
+            drawIKTree(window, treeGridArray[i], lengthVariation, 90, depthVariation, branchingVariation, swayOffset, time);
+        }
 
         window.display();
     }
