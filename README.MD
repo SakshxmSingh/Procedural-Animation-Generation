@@ -24,7 +24,8 @@
    cmake ..
    make
    ./mazeSpider // or
-   ./stickAnimation
+   ./stickAnimation // or
+   ./firefly
    ```
 5. Enjoy the game!
 

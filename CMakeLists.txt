@@ -20,6 +20,7 @@ find_package(OpenGL REQUIRED)
 
 add_executable(mazeSpider src/main.cpp src/mazegen.hpp src/mazegen.cpp src/spider.hpp src/spider.cpp src/tree.hpp src/tree.cpp)
 add_executable(stickAnimation src/animation.cpp)
+add_executable(firefly src/firefly.cpp)
 
 
 file(COPY assets DESTINATION ${CMAKE_BINARY_DIR})
@@ -30,7 +31,9 @@ include_directories(${SFML_INCLUDE_DIRS})
 # Link SFML libraries
 target_link_libraries(mazeSpider sfml-graphics sfml-window sfml-system)
 target_link_libraries(stickAnimation sfml-graphics sfml-window sfml-system)
+target_link_libraries(firefly sfml-graphics sfml-window sfml-system)
 
 # Link OpenGL libraries
 target_link_libraries(mazeSpider ${OPENGL_LIBRARIES})
 target_link_libraries(stickAnimation ${OPENGL_LIBRARIES})
+target_link_libraries(firefly ${OPENGL_LIBRARIES})
